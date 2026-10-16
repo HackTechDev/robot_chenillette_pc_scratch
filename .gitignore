@@ -1,0 +1,29 @@
+# Build
+build/
+build-*/
+cmake-build-*/
+CMakeLists.txt.user*
+*.pro.user*
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.o
+*.obj
+*.so
+*.a
+
+# Qt generated
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qm
+.qmake.stash
+.qtc_clangd/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
