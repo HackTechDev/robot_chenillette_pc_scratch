@@ -172,14 +172,25 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     // Bas : aide, fichiers, quitter
     QLabel *hint = label(QStringLiteral("Glisser les blocs dans la zone de programme · clic sur un nombre pour le "
-                                        "modifier · clic sur un script pour l'exécuter · clic droit : dupliquer / "
-                                        "supprimer · bloc ramené sur la palette = supprimé · Échap = arrêt"),
+                                        "modifier, molette pour l'ajuster · clic sur un script pour l'exécuter · "
+                                        "clic droit : dupliquer / supprimer, ranger · bloc ramené sur la palette = "
+                                        "supprimé · glisser le fond : déplacer la vue · Ctrl+molette : zoom · "
+                                        "Échap = arrêt"),
                          QStringLiteral("hint"));
     hint->setWordWrap(true);
     undoButton_ = button(QStringLiteral("↶"), QStringLiteral("small"), QStringLiteral("Annuler (Ctrl+Z)"));
     connect(undoButton_, &QPushButton::clicked, canvas_, &Canvas::undo);
     redoButton_ = button(QStringLiteral("↷"), QStringLiteral("small"), QStringLiteral("Rétablir (Ctrl+Y)"));
     connect(redoButton_, &QPushButton::clicked, canvas_, &Canvas::redo);
+    QPushButton *zoomOut = button(QStringLiteral("−"), QStringLiteral("small"), QStringLiteral("Zoom arrière (Ctrl+−)"));
+    connect(zoomOut, &QPushButton::clicked, canvas_, &Canvas::zoomOut);
+    QPushButton *zoomReset = button(QStringLiteral("100 %"), QStringLiteral("small"), QStringLiteral("Zoom 100 % (Ctrl+0)"));
+    zoomReset->setMinimumWidth(64);
+    connect(zoomReset, &QPushButton::clicked, canvas_, &Canvas::resetZoom);
+    connect(canvas_, &Canvas::zoomChanged, zoomReset,
+            [zoomReset](qreal zoom) { zoomReset->setText(QStringLiteral("%1 %").arg(qRound(zoom * 100))); });
+    QPushButton *zoomIn = button(QStringLiteral("+"), QStringLiteral("small"), QStringLiteral("Zoom avant (Ctrl++)"));
+    connect(zoomIn, &QPushButton::clicked, canvas_, &Canvas::zoomIn);
     QPushButton *newButton = button(QStringLiteral("Nouveau"), QStringLiteral("small"));
     connect(newButton, &QPushButton::clicked, this, &Window::newProgram);
     QPushButton *openButton = button(QStringLiteral("Ouvrir…"), QStringLiteral("small"));
@@ -194,6 +205,10 @@ Window::Window(QWidget *parent) : QWidget(parent)
     bottom->addWidget(hint, 1);
     bottom->addWidget(undoButton_);
     bottom->addWidget(redoButton_);
+    bottom->addSpacing(12);
+    bottom->addWidget(zoomOut);
+    bottom->addWidget(zoomReset);
+    bottom->addWidget(zoomIn);
     bottom->addSpacing(12);
     bottom->addWidget(newButton);
     bottom->addWidget(openButton);
@@ -221,6 +236,12 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(new QShortcut(QKeySequence::Save, this), &QShortcut::activated, this, &Window::saveProgram);
     connect(new QShortcut(QKeySequence::Undo, this), &QShortcut::activated, canvas_, &Canvas::undo);
     connect(new QShortcut(QKeySequence::Redo, this), &QShortcut::activated, canvas_, &Canvas::redo);
+    connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, canvas_, &Canvas::zoomIn);
+    connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this), &QShortcut::activated, canvas_,
+            &Canvas::zoomIn);  // Ctrl+= : « + » sans Maj sur un clavier QWERTY
+    connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated, canvas_, &Canvas::zoomOut);
+    connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated, canvas_,
+            &Canvas::resetZoom);
     connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y), this), &QShortcut::activated, canvas_, &Canvas::redo);
 
     autosaveTimer_.setSingleShot(true);

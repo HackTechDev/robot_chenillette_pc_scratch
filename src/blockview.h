@@ -44,7 +44,8 @@ QRectF bounds(const QList<Item> &items);
 void paint(QPainter &p, const Item &item, bool highlight = false);
 
 // Glisser-déposer d'une pile : hot = point saisi, relatif au coin haut gauche de la pile
-Qt::DropAction drag(QWidget *source, BlockPtr &stack, const QPointF &hot);
+// scale : zoom de la zone d'origine (taille de l'image glissée)
+Qt::DropAction drag(QWidget *source, BlockPtr &stack, const QPointF &hot, qreal scale = 1);
 BlockPtr fromMime(const QMimeData *mime, QPointF *hot);
 
 }  // namespace blockview

@@ -9,6 +9,9 @@
 #include <QMenu>
 #include <QPainter>
 #include <QRegularExpressionValidator>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QWheelEvent>
 
 #include <algorithm>
 #include <cmath>
@@ -22,6 +25,12 @@ constexpr qreal Margin = 8;
 constexpr qreal Grid = 24;
 constexpr qreal SnapDistance = 30;
 constexpr int MaxHistory = 200;
+constexpr qreal MinZoom = 0.5;
+constexpr qreal MaxZoom = 2;
+constexpr qreal ZoomStep = 1.25;
+constexpr int WheelNotch = 120;
+constexpr int WheelCommitMs = 600;
+constexpr qreal ArrangeGap = 24;
 const QPointF FirstScript(40, 40);
 const QString Format = QStringLiteral("batmobile-scratch");
 
@@ -32,10 +41,11 @@ Canvas::Canvas(QWidget *parent) : QWidget(parent)
     setAcceptDrops(true);
     editor_ = new QLineEdit(this);
     editor_->setAlignment(Qt::AlignCenter);
-    editor_->setStyleSheet(QStringLiteral("QLineEdit { background: #fff; color: #222; border: 2px solid #4C97FF;"
-                                          " border-radius: 12px; font-weight: bold; }"));
     editor_->hide();
     connect(editor_, &QLineEdit::editingFinished, this, &Canvas::commitEdit);
+    wheelCommit_.setSingleShot(true);
+    wheelCommit_.setInterval(WheelCommitMs);
+    connect(&wheelCommit_, &QTimer::timeout, this, &Canvas::edited);
     clear();
 }
 
@@ -196,7 +206,7 @@ void Canvas::relayout()
             s->pos += shift;
         return relayout();
     }
-    setMinimumSize(int(r.right()) + 300, int(r.bottom()) + 300);  // place pour agrandir
+    setMinimumSize(int((r.right() + 300) * zoom_), int((r.bottom() + 300) * zoom_));  // place pour agrandir
     update();
 }
 
@@ -268,9 +278,10 @@ void Canvas::paintEvent(QPaintEvent *e)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     p.fillRect(rect(), QColor(0x26, 0x26, 0x26));
+    p.scale(zoom_, zoom_);
 
     // Grille de points
-    const QRect r = e->rect();
+    const QRectF r(toModel(e->rect().topLeft()), QSizeF(e->rect().size()) / zoom_);
     p.setPen(QPen(QColor(0x3A, 0x3A, 0x3A), 2));
     for (qreal x = std::floor(r.left() / Grid) * Grid; x <= r.right(); x += Grid) {
         for (qreal y = std::floor(r.top() / Grid) * Grid; y <= r.bottom(); y += Grid)
@@ -292,16 +303,31 @@ void Canvas::mousePressEvent(QMouseEvent *e)
 {
     commitEdit();
     pressItem_ = -1;
-    if (e->button() == Qt::LeftButton) {
-        pressItem_ = itemAt(e->position());
-        pressPos_ = e->position();
+    pressPos_ = toModel(e->position());
+    if (e->button() == Qt::LeftButton)
+        pressItem_ = itemAt(pressPos_);
+    // Fond saisi (ou bouton du milieu) : déplacement de la vue
+    if ((e->button() == Qt::LeftButton && pressItem_ < 0) || e->button() == Qt::MiddleButton) {
+        panning_ = true;
+        panLast_ = e->globalPosition();
+        setCursor(Qt::ClosedHandCursor);
     }
 }
 
 void Canvas::mouseMoveEvent(QMouseEvent *e)
 {
+    if (panning_) {
+        // Position globale : le widget se déplace pendant le défilement
+        const QPointF delta = e->globalPosition() - panLast_;
+        panLast_ = e->globalPosition();
+        if (QScrollArea *area = scrollArea()) {
+            area->horizontalScrollBar()->setValue(area->horizontalScrollBar()->value() - qRound(delta.x()));
+            area->verticalScrollBar()->setValue(area->verticalScrollBar()->value() - qRound(delta.y()));
+        }
+        return;
+    }
     if (pressItem_ < 0 || running_ || !(e->buttons() & Qt::LeftButton)
-        || (e->position() - pressPos_).manhattanLength() < QApplication::startDragDistance())
+        || ((toModel(e->position()) - pressPos_) * zoom_).manhattanLength() < QApplication::startDragDistance())
         return;
     const int i = pressItem_;
     pressItem_ = -1;
@@ -310,12 +336,16 @@ void Canvas::mouseMoveEvent(QMouseEvent *e)
 
 void Canvas::mouseReleaseEvent(QMouseEvent *e)
 {
+    if (panning_) {
+        panning_ = false;
+        unsetCursor();
+    }
     const int i = pressItem_;
     pressItem_ = -1;
     if (i < 0 || e->button() != Qt::LeftButton)
         return;
     // Clic sur la valeur : modification ; ailleurs sur le script : exécution
-    if (!items_[i].value.isNull() && items_[i].value.contains(e->position()))
+    if (!items_[i].value.isNull() && items_[i].value.contains(toModel(e->position())))
         return editValue(i);
     if (!running_)
         emit runRequested(itemScripts_[i]->top.get());
@@ -323,10 +353,24 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
 
 void Canvas::contextMenuEvent(QContextMenuEvent *e)
 {
-    const int i = itemAt(e->pos());
-    if (i < 0 || running_)
+    if (running_)
         return;
     commitEdit();
+    const int i = itemAt(toModel(e->pos()));
+    if (i < 0) {
+        // Menu du fond
+        QMenu menu(this);
+        QAction *arrange = menu.addAction(QStringLiteral("Ranger les scripts"));
+        QAction *all = menu.addAction(QStringLiteral("Tout supprimer"));
+        arrange->setEnabled(!items_.isEmpty());
+        all->setEnabled(!items_.isEmpty());
+        QAction *chosen = menu.exec(e->globalPos());
+        if (chosen == arrange)
+            arrangeScripts();
+        else if (chosen == all)
+            removeAll();
+        return;
+    }
     QMenu menu(this);
     QAction *dup = menu.addAction(QStringLiteral("Dupliquer"));
     QAction *del = menu.addAction(QStringLiteral("Supprimer le bloc"));
@@ -346,7 +390,7 @@ void Canvas::startDrag(int item)
     BlockPtr stack = std::move(*slot);
     relayout();
     // Déposée ici, la pile est recopiée par dropEvent ; sur la palette, elle est jetée
-    if (blockview::drag(this, stack, hot) == Qt::IgnoreAction)
+    if (blockview::drag(this, stack, hot, zoom_) == Qt::IgnoreAction)
         *slot = std::move(stack);  // lâchée ailleurs : remise en place
     pruneScripts();
     relayout();
@@ -385,7 +429,7 @@ void Canvas::dragMoveEvent(QDragMoveEvent *e)
 {
     if (!incoming_)
         return e->ignore();
-    snap_ = findSnap(incoming_, e->position() - incomingHot_);
+    snap_ = findSnap(incoming_, toModel(e->position()) - incomingHot_);
     e->acceptProposedAction();
     update();
 }
@@ -402,7 +446,7 @@ void Canvas::dropEvent(QDropEvent *e)
     snap_ = {};
     if (!incoming_)
         return e->ignore();
-    drop(std::move(incoming_), e->position() - incomingHot_);
+    drop(std::move(incoming_), toModel(e->position()) - incomingHot_);
     e->acceptProposedAction();
     relayout();
     edited();
@@ -418,8 +462,12 @@ void Canvas::editValue(int item)
     delete editor_->validator();
     editor_->setValidator(new QRegularExpressionValidator(QRegularExpression(valuePattern(param)), editor_));
     editor_->setText(formatValue(param, it.block->value));
-    QRect r = it.value.toAlignedRect().adjusted(-4, -2, 4, 2);
-    r.setWidth(qMax(r.width(), 56));
+    editor_->setStyleSheet(QStringLiteral("QLineEdit { background: #fff; color: #222; border: 2px solid #4C97FF;"
+                                          " border-radius: %1px; font-weight: bold; font-size: %2px; }")
+                               .arg(qRound(12 * zoom_))
+                               .arg(qRound(13 * zoom_)));
+    QRect r = QRectF(it.value.topLeft() * zoom_, it.value.size() * zoom_).toAlignedRect().adjusted(-4, -2, 4, 2);
+    r.setWidth(qMax(r.width(), qRound(56 * zoom_)));
     editor_->setGeometry(r);
     editor_->show();
     editor_->setFocus();
@@ -428,6 +476,11 @@ void Canvas::editValue(int item)
 
 void Canvas::commitEdit()
 {
+    // Valeur changée à la molette : l'étape d'annulation est enregistrée maintenant
+    if (wheelCommit_.isActive()) {
+        wheelCommit_.stop();
+        edited();
+    }
     if (!edited_)
         return;
     Block *b = std::exchange(edited_, nullptr);
@@ -438,4 +491,136 @@ void Canvas::commitEdit()
         edited();
     }
     relayout();
+}
+
+// --- Molette : valeur sous la souris, ou zoom avec Ctrl ---
+
+void Canvas::wheelEvent(QWheelEvent *e)
+{
+    const int delta = e->angleDelta().y();
+    if (e->modifiers() & Qt::ControlModifier) {
+        setZoom(zoom_ * std::pow(ZoomStep, delta / qreal(WheelNotch)), e->position());
+        return e->accept();
+    }
+    const QPointF m = toModel(e->position());
+    const int i = itemAt(m);
+    if (i < 0 || items_[i].value.isNull() || !items_[i].value.contains(m)) {
+        wheelAccum_ = 0;
+        return e->ignore();  // la vue défile
+    }
+    e->accept();
+    // Crans entiers (un pavé tactile envoie de petites valeurs)
+    wheelAccum_ += delta;
+    const int steps = wheelAccum_ / WheelNotch;
+    wheelAccum_ -= steps * WheelNotch;
+    if (steps != 0)
+        stepValue(items_[i].block, steps);
+}
+
+void Canvas::stepValue(Block *block, int steps)
+{
+    if (edited_)
+        commitEdit();
+    const Param param = block->spec().param;
+    double v = block->value;
+    for (int n = 0; n < qAbs(steps); ++n) {
+        double step = 1;
+        if (param == Param::Seconds)  // 0,1 s jusqu'à 2 s, puis 0,5 s
+            step = (steps > 0 ? v >= 2 : v > 2) ? 0.5 : 0.1;
+        v = clampValue(param, v + (steps > 0 ? step : -step));
+    }
+    if (v == block->value)
+        return;
+    block->value = v;
+    relayout();
+    wheelCommit_.start();
+}
+
+// --- Zoom ---
+
+QScrollArea *Canvas::scrollArea() const
+{
+    for (QWidget *w = parentWidget(); w; w = w->parentWidget()) {
+        if (auto *area = qobject_cast<QScrollArea *>(w))
+            return area;
+    }
+    return nullptr;
+}
+
+QPointF Canvas::viewCenter() const
+{
+    const QScrollArea *area = scrollArea();
+    if (!area)
+        return rect().center();
+    return QPointF(area->horizontalScrollBar()->value() + area->viewport()->width() / 2.0,
+                   area->verticalScrollBar()->value() + area->viewport()->height() / 2.0);
+}
+
+void Canvas::zoomIn()
+{
+    setZoom(zoom_ * ZoomStep, viewCenter());
+}
+
+void Canvas::zoomOut()
+{
+    setZoom(zoom_ / ZoomStep, viewCenter());
+}
+
+void Canvas::resetZoom()
+{
+    setZoom(1, viewCenter());
+}
+
+void Canvas::setZoom(qreal zoom, const QPointF &anchor)
+{
+    zoom = qBound(MinZoom, zoom, MaxZoom);
+    if (qAbs(zoom - zoom_) < 1e-3)
+        return;
+    commitEdit();  // l'éditeur est placé pour l'ancien zoom
+    QScrollArea *area = scrollArea();
+    const QPointF model = toModel(anchor);
+    const QPointF scroll = area ? QPointF(area->horizontalScrollBar()->value(), area->verticalScrollBar()->value())
+                                : QPointF();
+    zoom_ = zoom;
+    relayout();
+    if (area) {
+        // Nouvelle taille appliquée tout de suite, pour pouvoir régler les barres de défilement
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
+        const QPointF target = model * zoom_ - (anchor - scroll);
+        area->horizontalScrollBar()->setValue(qRound(target.x()));
+        area->verticalScrollBar()->setValue(qRound(target.y()));
+    }
+    emit zoomChanged(zoom_);
+}
+
+// --- Menu du fond ---
+
+void Canvas::arrangeScripts()
+{
+    commitEdit();
+    std::vector<Script *> order;
+    for (const auto &s : scripts_) {
+        if (s->top)
+            order.push_back(s.get());
+    }
+    std::stable_sort(order.begin(), order.end(), [](const Script *a, const Script *b) {
+        return a->pos.y() != b->pos.y() ? a->pos.y() < b->pos.y() : a->pos.x() < b->pos.x();
+    });
+    qreal y = FirstScript.y();
+    for (Script *s : order) {
+        s->pos = QPointF(FirstScript.x(), y);
+        QList<Item> tmp;
+        blockview::layout(s->top, s->pos, tmp);
+        y += blockview::bounds(tmp).height() + ArrangeGap;
+    }
+    relayout();
+    edited();
+}
+
+void Canvas::removeAll()
+{
+    commitEdit();
+    scripts_.clear();
+    relayout();
+    edited();
 }

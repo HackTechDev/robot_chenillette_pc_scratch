@@ -214,19 +214,20 @@ void paint(QPainter &p, const Item &item, bool highlight)
     }
 }
 
-Qt::DropAction drag(QWidget *source, BlockPtr &stack, const QPointF &hot)
+Qt::DropAction drag(QWidget *source, BlockPtr &stack, const QPointF &hot, qreal scale)
 {
     // Image de la pile
     QList<Item> items;
     layout(stack, QPointF(), items);
     const QRectF r = bounds(items).adjusted(-4, -4, 4, 4);
     const qreal dpr = qApp->devicePixelRatio();
-    QPixmap pixmap((r.size() * dpr).toSize());
+    QPixmap pixmap((r.size() * scale * dpr).toSize());
     pixmap.setDevicePixelRatio(dpr);
     pixmap.fill(Qt::transparent);
     {
         QPainter p(&pixmap);
         p.setRenderHint(QPainter::Antialiasing);
+        p.scale(scale, scale);
         p.translate(-r.topLeft());
         for (const Item &it : items)
             paint(p, it);
@@ -242,7 +243,7 @@ Qt::DropAction drag(QWidget *source, BlockPtr &stack, const QPointF &hot)
     auto *d = new QDrag(source);
     d->setMimeData(mime);
     d->setPixmap(pixmap);
-    d->setHotSpot((hot - r.topLeft()).toPoint());
+    d->setHotSpot(((hot - r.topLeft()) * scale).toPoint());
     return d->exec(Qt::MoveAction);
 }
 

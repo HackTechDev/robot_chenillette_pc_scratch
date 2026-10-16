@@ -3,12 +3,14 @@
 #include "blockview.h"
 
 #include <QJsonObject>
+#include <QTimer>
 #include <QWidget>
 
 #include <memory>
 #include <vector>
 
 class QLineEdit;
+class QScrollArea;
 
 // Zone de programme : scripts posés librement, blocs emboîtés par glisser-déposer
 class Canvas : public QWidget
@@ -34,6 +36,16 @@ public:
     void setSavedState(const QJsonObject &state) { saved_ = state; }
     void markSaved() { saved_ = save(); }
 
+    // Zoom (50 à 200 %), autour du centre de la vue
+    qreal zoom() const { return zoom_; }
+    void zoomIn();
+    void zoomOut();
+    void resetZoom();
+
+    // Menu du fond (annulables)
+    void arrangeScripts();  // en colonne, dans l'ordre de haut en bas
+    void removeAll();
+
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
 
@@ -45,6 +57,7 @@ signals:
     void runRequested(const Block *first);  // clic sur un script
     void changed();
     void historyChanged();
+    void zoomChanged(qreal zoom);
 
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -52,6 +65,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
     void contextMenuEvent(QContextMenuEvent *e) override;
+    void wheelEvent(QWheelEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dragMoveEvent(QDragMoveEvent *e) override;
     void dragLeaveEvent(QDragLeaveEvent *e) override;
@@ -75,6 +89,11 @@ private:
     void resetHistory();
     void restore(const QJsonObject &o);
     void relayout();
+    QPointF toModel(const QPointF &widgetPos) const { return widgetPos / zoom_; }
+    QScrollArea *scrollArea() const;
+    QPointF viewCenter() const;
+    void setZoom(qreal zoom, const QPointF &anchor);  // anchor (widget) reste sous la souris
+    void stepValue(Block *block, int steps);
     int itemAt(const QPointF &pos) const;
     Snap findSnap(BlockPtr &stack, const QPointF &topLeft) const;
     void drop(BlockPtr stack, const QPointF &topLeft);
@@ -92,7 +111,12 @@ private:
     bool running_ = false;
     const Block *current_ = nullptr;
     int pressItem_ = -1;
-    QPointF pressPos_;
+    QPointF pressPos_;  // coordonnées du programme (sans zoom)
+    bool panning_ = false;
+    QPointF panLast_;   // position globale
+    qreal zoom_ = 1;
+    int wheelAccum_ = 0;
+    QTimer wheelCommit_;  // regroupe les crans de molette en une seule étape d'annulation
     BlockPtr incoming_;  // pile qui survole la zone pendant un glisser-déposer
     QPointF incomingHot_;
     Snap snap_;

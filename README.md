@@ -28,14 +28,17 @@ Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.c
 
 Dans la zone de programme :
 
-- clic sur un nombre : le modifier (virgule ou point) ;
+- clic sur un nombre : le modifier (virgule ou point) ; **molette** sur un nombre : l'augmenter ou le diminuer (durées : 0,1 s par cran jusqu'à 2 s, puis 0,5 s ; nombres de tours et vitesse : 1 par cran) ;
 - clic sur un script : l'exécuter seul ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
-- clic droit : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent).
+- clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent) ;
+- clic droit sur le fond : **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (annulables avec ↶) ;
+- glisser le fond (ou bouton du milieu) : déplacer la vue ;
+- **zoom** de 50 à 200 % : Ctrl+molette (autour de la souris), boutons **− / 100 % / +** en bas, Ctrl++ / Ctrl+− / Ctrl+0.
 
 Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne peuvent pas être déplacés.
 
-**↶ / ↷** (Ctrl+Z / Ctrl+Y ou Ctrl+Maj+Z) : annuler ou rétablir la dernière modification (ajout, déplacement, suppression, valeur), jusqu'à 200 étapes. Indisponible pendant l'exécution.
+**↶ / ↷** (Ctrl+Z / Ctrl+Y ou Ctrl+Maj+Z) : annuler ou rétablir la dernière modification (ajout, déplacement, suppression, valeur, rangement), jusqu'à 200 étapes ; plusieurs crans de molette d'affilée comptent pour une seule étape. Indisponible pendant l'exécution.
 
 **Nouveau**, **Ouvrir…**, **Enregistrer…** (Ctrl+N / Ctrl+O / Ctrl+S) : les programmes sont des fichiers `.batmobile` (JSON).
 
