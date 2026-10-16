@@ -24,6 +24,7 @@ public:
 
 signals:
     void current(const Block *block);  // nullptr à la fin
+    void sent(char cmd);               // commande envoyée (ou simulée)
     void finished();
 
 private:
@@ -34,6 +35,7 @@ private:
         quint64 waits;      // waits_ au début du tour
     };
 
+    void send(char cmd);
     void step();
     void onTimeout();
     void wait(double seconds);

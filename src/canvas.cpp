@@ -21,6 +21,7 @@ namespace {
 constexpr qreal Margin = 8;
 constexpr qreal Grid = 24;
 constexpr qreal SnapDistance = 30;
+constexpr int MaxHistory = 200;
 const QPointF FirstScript(40, 40);
 const QString Format = QStringLiteral("batmobile-scratch");
 
@@ -46,6 +47,7 @@ void Canvas::clear()
     scripts_.clear();
     addScript(FirstScript, std::make_unique<Block>(Kind::Start));
     relayout();
+    resetHistory();
 }
 
 QJsonObject Canvas::save() const
@@ -68,6 +70,62 @@ bool Canvas::load(const QJsonObject &o)
     if (o[QStringLiteral("format")].toString() != Format)
         return false;
     commitEdit();
+    restore(o);
+    resetHistory();
+    return true;
+}
+
+bool Canvas::isModified() const
+{
+    return history_[historyIndex_] != saved_;
+}
+
+// --- Annuler / rétablir : un état JSON complet par modification ---
+
+void Canvas::undo()
+{
+    commitEdit();  // une saisie en cours compte comme une modification
+    if (!canUndo())
+        return;
+    restore(history_[--historyIndex_]);
+    emit changed();
+    emit historyChanged();
+}
+
+void Canvas::redo()
+{
+    commitEdit();
+    if (!canRedo())
+        return;
+    restore(history_[++historyIndex_]);
+    emit changed();
+    emit historyChanged();
+}
+
+void Canvas::edited()
+{
+    const QJsonObject state = save();
+    if (state == history_[historyIndex_])
+        return;  // ex. pile lâchée à sa place
+    history_.resize(historyIndex_ + 1);  // l'historique « rétablir » est perdu
+    history_.append(state);
+    if (history_.size() > MaxHistory)
+        history_.removeFirst();
+    historyIndex_ = history_.size() - 1;
+    emit changed();
+    emit historyChanged();
+}
+
+void Canvas::resetHistory()
+{
+    history_ = {save()};
+    historyIndex_ = 0;
+    saved_ = history_[0];
+    emit historyChanged();
+}
+
+void Canvas::restore(const QJsonObject &o)
+{
     scripts_.clear();
     for (const QJsonValue &v : o[QStringLiteral("scripts")].toArray()) {
         const QJsonObject s = v.toObject();
@@ -75,7 +133,6 @@ bool Canvas::load(const QJsonObject &o)
             addScript(QPointF(s[QStringLiteral("x")].toDouble(), s[QStringLiteral("y")].toDouble()), std::move(top));
     }
     relayout();
-    return true;
 }
 
 const Block *Canvas::startScript() const
@@ -96,6 +153,7 @@ void Canvas::setRunning(bool on)
     if (!on)
         current_ = nullptr;
     update();
+    emit historyChanged();  // annuler / rétablir bloqués pendant l'exécution
 }
 
 void Canvas::setCurrent(const Block *block)
@@ -292,7 +350,7 @@ void Canvas::startDrag(int item)
         *slot = std::move(stack);  // lâchée ailleurs : remise en place
     pruneScripts();
     relayout();
-    emit changed();
+    edited();
 }
 
 void Canvas::removeBlock(int item)
@@ -303,7 +361,7 @@ void Canvas::removeBlock(int item)
     *slot = std::move(removed->next);
     pruneScripts();
     relayout();
-    emit changed();
+    edited();
 }
 
 void Canvas::duplicate(int item)
@@ -311,7 +369,7 @@ void Canvas::duplicate(int item)
     const Item &it = items_[item];
     addScript(it.pos + QPointF(24, 24), blocksFromJson(blocksToJson(it.block)));
     relayout();
-    emit changed();
+    edited();
 }
 
 // --- Glisser-déposer ---
@@ -347,7 +405,7 @@ void Canvas::dropEvent(QDropEvent *e)
     drop(std::move(incoming_), e->position() - incomingHot_);
     e->acceptProposedAction();
     relayout();
-    emit changed();
+    edited();
 }
 
 // --- Saisie d'une valeur ---
@@ -377,7 +435,7 @@ void Canvas::commitEdit()
     double v = 0;
     if (parseValue(b->spec().param, editor_->text(), &v) && v != b->value) {
         b->value = v;
-        emit changed();
+        edited();
     }
     relayout();
 }

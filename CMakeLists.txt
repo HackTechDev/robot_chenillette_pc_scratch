@@ -25,6 +25,7 @@ qt_add_executable(batmobile_scratch
     src/palette.h src/palette.cpp
     src/canvas.h src/canvas.cpp
     src/runner.h src/runner.cpp
+    src/stage.h src/stage.cpp
 )
 target_link_libraries(batmobile_scratch PRIVATE batmobile_bluez Qt6::Widgets)
 

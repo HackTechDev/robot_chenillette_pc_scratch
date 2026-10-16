@@ -11,8 +11,9 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    app.setApplicationName(QStringLiteral("batmobile_scratch"));  // dossier de la sauvegarde automatique
     Window w;
-    w.resize(1100, 720);
+    w.resize(1400, 760);
     w.show();
     return app.exec();
 }

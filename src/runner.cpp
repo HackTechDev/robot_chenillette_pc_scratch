@@ -13,6 +13,7 @@ constexpr int MinWaitMs = 20;
 Runner::Runner(Link &link, QObject *parent) : QObject(parent), link_(link)
 {
     timer_.setSingleShot(true);
+    timer_.setTimerType(Qt::PreciseTimer);  // un minuteur « coarse » peut décaler une durée de 5 %
     connect(&timer_, &QTimer::timeout, this, &Runner::onTimeout);
 }
 
@@ -21,7 +22,7 @@ void Runner::start(const Block *first)
     stop();
     running_ = true;
     frames_ = {{first, nullptr, 0, waits_}};
-    link_.send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
+    send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
     step();
 }
 
@@ -32,8 +33,14 @@ void Runner::stop()
     timer_.stop();
     frames_.clear();
     moving_ = false;
-    link_.send(Stop);
+    send(Stop);
     finish();
+}
+
+void Runner::send(char cmd)
+{
+    link_.send(cmd);  // sans effet si le robot n'est pas connecté
+    emit sent(cmd);
 }
 
 void Runner::finish()
@@ -47,7 +54,7 @@ void Runner::onTimeout()
 {
     if (moving_) {
         moving_ = false;
-        link_.send(Stop);
+        send(Stop);
     }
     step();
 }
@@ -92,15 +99,15 @@ void Runner::step()
             frames_.append({b->body.get(), b, 0, waits_});
             break;
         case Kind::Speed:
-            link_.send(char('0' + int(b->value)));
+            send(char('0' + int(b->value)));
             break;
         case Kind::Stop:
-            link_.send(Stop);
+            send(Stop);
             break;
         case Kind::Wait:
             return wait(b->value);
         default:
-            link_.send(b->spec().cmd);
+            send(b->spec().cmd);
             moving_ = true;
             return wait(b->value);
         }

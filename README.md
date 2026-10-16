@@ -22,7 +22,7 @@ Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.c
 
 ## Utilisation
 
-1. **Connecter** le robot (en haut) : comme dans la télécommande, BatMobile est présélectionné, et appairé automatiquement s'il ne l'est pas encore. Sans robot, le programme s'exécute en **simulation** : les blocs s'allument, rien n'est envoyé.
+1. **Connecter** le robot (en haut) : comme dans la télécommande, BatMobile est présélectionné, et appairé automatiquement s'il ne l'est pas encore. Sans robot, le programme s'exécute quand même : seule la scène bouge.
 2. **Glisser** les blocs de la palette (à gauche) vers la zone de programme et les emboîter sous **quand ▶ est cliqué**. Un trait blanc montre où le bloc va s'accrocher.
 3. **▶** exécute le script qui commence par **quand ▶ est cliqué** (le plus haut s'il y en a plusieurs). **■** ou **Échap** arrête le programme et le robot.
 
@@ -35,7 +35,17 @@ Dans la zone de programme :
 
 Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne peuvent pas être déplacés.
 
+**↶ / ↷** (Ctrl+Z / Ctrl+Y ou Ctrl+Maj+Z) : annuler ou rétablir la dernière modification (ajout, déplacement, suppression, valeur), jusqu'à 200 étapes. Indisponible pendant l'exécution.
+
 **Nouveau**, **Ouvrir…**, **Enregistrer…** (Ctrl+N / Ctrl+O / Ctrl+S) : les programmes sont des fichiers `.batmobile` (JSON).
+
+**Sauvegarde automatique** : le programme en cours, enregistré ou non, est sauvegardé une seconde après chaque modification et à la fermeture, dans `~/.local/share/batmobile_scratch/autosave.batmobile`. Il est rouvert au lancement suivant (même après un plantage), avec son nom de fichier et l'astérisque s'il n'était pas enregistré. Quitter ne demande donc plus d'enregistrer.
+
+## Scène (simulation)
+
+À droite, le robot vu de dessus suit les commandes du programme, robot connecté ou non : déplacements avec la trace du parcours, ouverture de la pince, jauge de la hauteur de la tête. **⟲ Replacer** le remet au centre et efface la trace. Il bute sur les bords de la scène.
+
+Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 100 unités/s en ligne droite (la scène fait 480 × 360) et 180°/s en pivot, donc **pivoter 0,5 s ≈ un quart de tour**. Le vrai robot dépend du sol et de la batterie : pour que la scène lui ressemble, mesurer ses déplacements et ajuster `UnitsPerSpeed` et `DegreesPerSpeed`.
 
 ## Blocs
 

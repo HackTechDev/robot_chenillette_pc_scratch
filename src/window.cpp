@@ -5,6 +5,7 @@
 #include "config.h"
 #include "pairing.h"
 #include "palette.h"
+#include "stage.h"
 
 #include <QCloseEvent>
 #include <QComboBox>
@@ -19,9 +20,11 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QShortcut>
+#include <QStandardPaths>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -29,16 +32,27 @@ namespace {
 
 const QString FileFilter = QStringLiteral("Programmes BatMobile (*.batmobile);;Tous les fichiers (*)");
 const QString FileSuffix = QStringLiteral(".batmobile");
+const QString AutosaveFormat = QStringLiteral("batmobile-scratch-autosave");
+constexpr int AutosaveDelayMs = 1000;
+
+// ~/.local/share/batmobile_scratch/autosave.batmobile
+QString autosavePath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath(QStringLiteral("autosave") + FileSuffix);
+}
 
 const char *const Style = R"(
 QWidget { background: #111; color: #fff; }
 QLabel#title { color: #FFD700; font-size: 24px; font-weight: bold; letter-spacing: 2px; }
 QLabel#hint { color: #888; font-size: 11px; }
+QLabel#section { color: #bbb; font-size: 12px; font-weight: bold; }
 QComboBox { background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 6px; }
 QPushButton#bt { border: 2px solid #555; border-radius: 16px; padding: 6px 20px; font-size: 14px; }
 QPushButton#bt[connected="true"] { border-color: #4caf50; }
 QPushButton#small { border: 1px solid #555; border-radius: 6px; padding: 6px 12px; }
 QPushButton#small:hover { border-color: #888; }
+QPushButton#small:disabled { color: #555; border-color: #333; }
 QPushButton#run { background: #4caf50; border-radius: 20px; font-size: 20px; font-weight: bold; }
 QPushButton#run:disabled { background: #2e5e30; color: #8a8a8a; }
 QPushButton#stop { background: #e53935; border-radius: 20px; font-size: 18px; font-weight: bold; }
@@ -125,14 +139,36 @@ Window::Window(QWidget *parent) : QWidget(parent)
     canvasScroll->setWidget(canvas_);
     canvasScroll->setWidgetResizable(true);
     connect(canvas_, &Canvas::runRequested, this, &Window::run);
-    connect(canvas_, &Canvas::changed, this, [this] { setModified(true); });
+    connect(canvas_, &Canvas::changed, this, [this] { setModified(canvas_->isModified()); });
     connect(&runner_, &Runner::current, canvas_, &Canvas::setCurrent);
     connect(&runner_, &Runner::finished, this, &Window::onFinished);
+    connect(canvas_, &Canvas::historyChanged, this, &Window::updateHistoryButtons);
+
+    // Scène : le robot simulé suit les commandes du programme
+    stage_ = new Stage;
+    stage_->setFixedSize(360, 270);
+    connect(&runner_, &Runner::sent, stage_, &Stage::command);
+    QPushButton *replace = button(QStringLiteral("⟲ Replacer"), QStringLiteral("small"),
+                                  QStringLiteral("Remettre le robot au centre et effacer la trace"));
+    connect(replace, &QPushButton::clicked, stage_, &Stage::reset);
+    auto *stageCol = new QVBoxLayout;
+    stageCol->setContentsMargins(12, 0, 0, 0);
+    stageCol->addWidget(label(QStringLiteral("Scène (simulation)"), QStringLiteral("section")));
+    stageCol->addWidget(stage_);
+    stageCol->addWidget(replace, 0, Qt::AlignLeft);
+    QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. "
+                                             "Distances et angles approximatifs."),
+                              QStringLiteral("hint"));
+    stageHint->setWordWrap(true);
+    stageHint->setFixedWidth(360);
+    stageCol->addWidget(stageHint);
+    stageCol->addStretch();
 
     auto *workspace = new QHBoxLayout;
     workspace->setSpacing(0);
     workspace->addWidget(paletteScroll);
     workspace->addWidget(canvasScroll, 1);
+    workspace->addLayout(stageCol);
 
     // Bas : aide, fichiers, quitter
     QLabel *hint = label(QStringLiteral("Glisser les blocs dans la zone de programme · clic sur un nombre pour le "
@@ -140,6 +176,10 @@ Window::Window(QWidget *parent) : QWidget(parent)
                                         "supprimer · bloc ramené sur la palette = supprimé · Échap = arrêt"),
                          QStringLiteral("hint"));
     hint->setWordWrap(true);
+    undoButton_ = button(QStringLiteral("↶"), QStringLiteral("small"), QStringLiteral("Annuler (Ctrl+Z)"));
+    connect(undoButton_, &QPushButton::clicked, canvas_, &Canvas::undo);
+    redoButton_ = button(QStringLiteral("↷"), QStringLiteral("small"), QStringLiteral("Rétablir (Ctrl+Y)"));
+    connect(redoButton_, &QPushButton::clicked, canvas_, &Canvas::redo);
     QPushButton *newButton = button(QStringLiteral("Nouveau"), QStringLiteral("small"));
     connect(newButton, &QPushButton::clicked, this, &Window::newProgram);
     QPushButton *openButton = button(QStringLiteral("Ouvrir…"), QStringLiteral("small"));
@@ -152,6 +192,9 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     auto *bottom = new QHBoxLayout;
     bottom->addWidget(hint, 1);
+    bottom->addWidget(undoButton_);
+    bottom->addWidget(redoButton_);
+    bottom->addSpacing(12);
     bottom->addWidget(newButton);
     bottom->addWidget(openButton);
     bottom->addWidget(saveButton);
@@ -176,9 +219,18 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(new QShortcut(QKeySequence::New, this), &QShortcut::activated, this, &Window::newProgram);
     connect(new QShortcut(QKeySequence::Open, this), &QShortcut::activated, this, &Window::openProgram);
     connect(new QShortcut(QKeySequence::Save, this), &QShortcut::activated, this, &Window::saveProgram);
+    connect(new QShortcut(QKeySequence::Undo, this), &QShortcut::activated, canvas_, &Canvas::undo);
+    connect(new QShortcut(QKeySequence::Redo, this), &QShortcut::activated, canvas_, &Canvas::redo);
+    connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y), this), &QShortcut::activated, canvas_, &Canvas::redo);
+
+    autosaveTimer_.setSingleShot(true);
+    autosaveTimer_.setInterval(AutosaveDelayMs);
+    connect(&autosaveTimer_, &QTimer::timeout, this, &Window::autosave);
 
     refreshDevices();
-    setModified(false);
+    restoreAutosave();
+    setModified(canvas_->isModified());
+    updateHistoryButtons();
 }
 
 // --- Connexion ---
@@ -323,6 +375,7 @@ void Window::run(const Block *first)
         return;
     }
     canvas_->setRunning(true);
+    canvas_->setFocus();  // termine une saisie en cours
     palette_->setLocked(true);
     runButton_->setEnabled(false);
     status_->setText(connected_ ? QStringLiteral("Programme en cours… (■ ou Échap pour arrêter)")
@@ -345,6 +398,47 @@ void Window::setModified(bool on)
     modified_ = on;
     const QString name = fileName_.isEmpty() ? QStringLiteral("sans titre") : QFileInfo(fileName_).fileName();
     setWindowTitle(QStringLiteral("%1 — %2%3").arg(RobotName, name, on ? QStringLiteral(" *") : QString()));
+    autosaveTimer_.start();
+}
+
+void Window::updateHistoryButtons()
+{
+    undoButton_->setEnabled(canvas_->canUndo());
+    redoButton_->setEnabled(canvas_->canRedo());
+}
+
+// Sauvegarde automatique : le programme en cours (enregistré ou non) est retrouvé au
+// prochain lancement, même après un plantage
+void Window::autosave()
+{
+    autosaveTimer_.stop();
+    const QJsonObject o{
+        {QStringLiteral("format"), AutosaveFormat},
+        {QStringLiteral("program"), canvas_->save()},
+        {QStringLiteral("saved"), canvas_->savedState()},
+        {QStringLiteral("fileName"), fileName_},
+    };
+    const QString path = autosavePath();
+    QDir().mkpath(QFileInfo(path).path());
+    QSaveFile file(path);
+    if (file.open(QIODevice::WriteOnly))
+        file.write(QJsonDocument(o).toJson());
+    if (!file.commit())
+        qWarning("Sauvegarde automatique impossible : %s", qPrintable(file.errorString()));
+}
+
+void Window::restoreAutosave()
+{
+    QFile file(autosavePath());
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+    const QJsonObject o = QJsonDocument::fromJson(file.readAll()).object();
+    if (o[QStringLiteral("format")].toString() != AutosaveFormat
+        || !canvas_->load(o[QStringLiteral("program")].toObject()))
+        return;
+    canvas_->setSavedState(o[QStringLiteral("saved")].toObject());
+    fileName_ = o[QStringLiteral("fileName")].toString();
+    status_->setText(QStringLiteral("Programme de la dernière séance retrouvé"));
 }
 
 void Window::newProgram()
@@ -396,6 +490,7 @@ bool Window::saveProgram()
         return false;
     }
     fileName_ = path;
+    canvas_->markSaved();
     setModified(false);
     return true;
 }
@@ -427,12 +522,14 @@ bool Window::confirmQuit()
 
 void Window::closeEvent(QCloseEvent *e)
 {
-    // Bouton ✕ comme croix de la barre de titre : confirmation avant de quitter
+    // Bouton ✕ comme croix de la barre de titre : confirmation avant de quitter. Rien n'est
+    // perdu : le programme, même non enregistré, est sauvegardé automatiquement.
     runner_.stop();
-    if (!(modified_ ? confirmDiscard() : confirmQuit())) {
+    if (!confirmQuit()) {
         e->ignore();
         return;
     }
+    autosave();
     delete pairing_;  // annule un appairage en cours
     pairing_ = nullptr;
     link_.disconnectFromRobot();  // envoie un stop avant de fermer

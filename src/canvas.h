@@ -20,7 +20,19 @@ public:
 
     void clear();  // un seul bloc « quand ▶ est cliqué »
     QJsonObject save() const;
-    bool load(const QJsonObject &o);
+    bool load(const QJsonObject &o);  // remet l'historique à zéro
+
+    // Annuler / rétablir (sauf pendant l'exécution)
+    bool canUndo() const { return !running_ && historyIndex_ > 0; }
+    bool canRedo() const { return !running_ && historyIndex_ < history_.size() - 1; }
+    void undo();
+    void redo();
+
+    // Différent du dernier état enregistré (ou chargé)
+    bool isModified() const;
+    QJsonObject savedState() const { return saved_; }
+    void setSavedState(const QJsonObject &state) { saved_ = state; }
+    void markSaved() { saved_ = save(); }
 
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
@@ -32,6 +44,7 @@ public:
 signals:
     void runRequested(const Block *first);  // clic sur un script
     void changed();
+    void historyChanged();
 
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -58,6 +71,9 @@ private:
         bool valid() const { return slot || before; }
     };
 
+    void edited();  // enregistre l'état dans l'historique et émet changed
+    void resetHistory();
+    void restore(const QJsonObject &o);
     void relayout();
     int itemAt(const QPointF &pos) const;
     Snap findSnap(BlockPtr &stack, const QPointF &topLeft) const;
@@ -82,4 +98,7 @@ private:
     Snap snap_;
     QLineEdit *editor_;
     Block *edited_ = nullptr;
+    QList<QJsonObject> history_;
+    int historyIndex_ = 0;
+    QJsonObject saved_;
 };

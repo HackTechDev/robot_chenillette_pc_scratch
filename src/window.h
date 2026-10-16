@@ -3,11 +3,13 @@
 #include "link.h"
 #include "runner.h"
 
+#include <QTimer>
 #include <QWidget>
 
 class Canvas;
 class Palette;
 class Pairing;
+class Stage;
 class QComboBox;
 class QLabel;
 class QPushButton;
@@ -47,6 +49,9 @@ private:
     void openProgram();
     bool saveProgram();
     void setModified(bool on);
+    void updateHistoryButtons();
+    void autosave();
+    void restoreAutosave();
     bool confirmDiscard();  // programme modifié : enregistrer / abandonner / annuler
     bool confirmQuit();
 
@@ -57,11 +62,15 @@ private:
     Pairing *pairing_ = nullptr;
     bool modified_ = false;
     QString fileName_;
+    QTimer autosaveTimer_;
 
     QComboBox *deviceBox_;
     QPushButton *btButton_;
     QLabel *status_;
     QPushButton *runButton_;
+    QPushButton *undoButton_;
+    QPushButton *redoButton_;
     Palette *palette_;
     Canvas *canvas_;
+    Stage *stage_;
 };
