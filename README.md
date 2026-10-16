@@ -4,6 +4,8 @@ Application de bureau (C++ / Qt6) pour **programmer les déplacements** du robot
 
 Même liaison, même appairage et même protocole que la télécommande [`../robot_chenillette_pc_qt6`](../robot_chenillette_pc_qt6).
 
+Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.com/HackTechDev/robot_chenillette_pc_scratch)
+
 ## Prérequis
 
 - Linux avec BlueZ (service `bluetooth` actif) et un adaptateur Bluetooth
