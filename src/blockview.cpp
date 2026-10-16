@@ -184,8 +184,14 @@ QRectF bounds(const QList<Item> &items)
     return r;
 }
 
-void paint(QPainter &p, const Item &item, bool highlight)
+void paint(QPainter &p, const Item &item, bool highlight, bool ghost)
 {
+    if (ghost) {
+        p.setPen(QPen(QColor(0xAA, 0xAA, 0xAA), 1));
+        p.setBrush(QColor(0x88, 0x88, 0x88, 150));
+        p.drawPath(item.path);
+        return;
+    }
     const Spec &s = item.block->spec();
     const QColor color(s.color);
     const QColor border = color.darker(130);

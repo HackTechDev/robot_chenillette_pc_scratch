@@ -51,7 +51,7 @@ struct Range {
 Range range(Param p)
 {
     switch (p) {
-    case Param::Seconds: return {0, 60, 1};
+    case Param::Seconds: return {0, 60, 2};  // 0,25 s = un huitième de tour
     case Param::Count: return {0, 100, 0};
     case Param::Speed: return {0, SpeedLevels - 1, 0};
     case Param::None: break;
@@ -96,7 +96,11 @@ double clampValue(Param p, double v)
 
 QString formatValue(Param p, double v)
 {
-    return QString::number(clampValue(p, v), 'f', range(p).decimals).replace('.', ',');
+    QString text = QString::number(clampValue(p, v), 'f', range(p).decimals);
+    // Durées : une décimale au moins (« 1,0 »), deux si besoin (« 0,25 »)
+    while (text.endsWith('0') && text.indexOf('.') >= 0 && text.size() - text.indexOf('.') > 2)
+        text.chop(1);
+    return text.replace('.', ',');
 }
 
 bool parseValue(Param p, QString text, double *out)
@@ -111,7 +115,7 @@ bool parseValue(Param p, QString text, double *out)
 QString valuePattern(Param p)
 {
     switch (p) {
-    case Param::Seconds: return QStringLiteral("\\d{0,2}([.,]\\d?)?");
+    case Param::Seconds: return QStringLiteral("\\d{0,2}([.,]\\d{0,2})?");
     case Param::Count: return QStringLiteral("\\d{0,3}");
     case Param::Speed: return QStringLiteral("\\d?");
     case Param::None: break;

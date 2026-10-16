@@ -114,6 +114,8 @@ void Canvas::redo()
 
 void Canvas::edited()
 {
+    if (ghostSlot_)
+        return;  // aperçu en cours : le dépôt enregistrera l'état
     const QJsonObject state = save();
     if (state == history_[historyIndex_])
         return;  // ex. pile lâchée à sa place
@@ -289,14 +291,9 @@ void Canvas::paintEvent(QPaintEvent *e)
     }
 
     for (const Item &it : items_)
-        blockview::paint(p, it, it.block == current_);
-
-    if (snap_.valid()) {
-        // Endroit où la pile va s'emboîter
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(255, 255, 255, 220));
-        p.drawRoundedRect(QRectF(snap_.at - QPointF(0, 3), QSizeF(90, 6)), 3, 3);
-    }
+        blockview::paint(p, it, it.block == current_, ghostBlocks_.contains(it.block));
+    for (const Item &it : ghostItems_)
+        blockview::paint(p, it, false, true);
 }
 
 void Canvas::mousePressEvent(QMouseEvent *e)
@@ -390,7 +387,9 @@ void Canvas::startDrag(int item)
     BlockPtr stack = std::move(*slot);
     relayout();
     // Déposée ici, la pile est recopiée par dropEvent ; sur la palette, elle est jetée
-    if (blockview::drag(this, stack, hot, zoom_) == Qt::IgnoreAction)
+    const Qt::DropAction action = blockview::drag(this, stack, hot, zoom_);
+    endDrop();  // au cas où aucun dragLeave n'a été reçu
+    if (action == Qt::IgnoreAction)
         *slot = std::move(stack);  // lâchée ailleurs : remise en place
     pruneScripts();
     relayout();
@@ -420,36 +419,80 @@ void Canvas::duplicate(int item)
 
 void Canvas::dragEnterEvent(QDragEnterEvent *e)
 {
+    endDrop();
     if (running_ || !(incoming_ = blockview::fromMime(e->mimeData(), &incomingHot_)))
         return e->ignore();
+    // Blocs de la pile survolante, dessinés en gris une fois insérés
+    QList<Item> tmp;
+    blockview::layout(incoming_, QPointF(), tmp);
+    for (const Item &it : tmp)
+        ghostBlocks_.insert(it.block);
     e->acceptProposedAction();
 }
 
 void Canvas::dragMoveEvent(QDragMoveEvent *e)
 {
-    if (!incoming_)
+    if (!incoming_ && !ghostSlot_)
         return e->ignore();
-    snap_ = findSnap(incoming_, toModel(e->position()) - incomingHot_);
+    removeGhost();  // l'accroche se cherche dans le programme sans l'aperçu
+    showGhost(findSnap(incoming_, toModel(e->position()) - incomingHot_));
     e->acceptProposedAction();
-    update();
 }
 
 void Canvas::dragLeaveEvent(QDragLeaveEvent *)
 {
-    incoming_.reset();
-    snap_ = {};
-    update();
+    endDrop();
 }
 
 void Canvas::dropEvent(QDropEvent *e)
 {
-    snap_ = {};
+    removeGhost();
     if (!incoming_)
         return e->ignore();
     drop(std::move(incoming_), toModel(e->position()) - incomingHot_);
+    endDrop();
     e->acceptProposedAction();
-    relayout();
     edited();
+}
+
+void Canvas::showGhost(const Snap &snap)
+{
+    if (snap.slot) {
+        // Insérée pour de vrai : les blocs suivants descendent
+        ghostTail_ = lastBlock(incoming_.get());
+        ghostTail_->next = std::move(*snap.slot);
+        *snap.slot = std::move(incoming_);
+        ghostSlot_ = snap.slot;
+        relayout();
+    } else if (snap.before) {
+        QList<Item> tmp;
+        const qreal h = blockview::layout(incoming_, QPointF(), tmp);
+        blockview::layout(incoming_, snap.before->pos - QPointF(0, h), ghostItems_);
+        update();
+    }
+}
+
+void Canvas::removeGhost()
+{
+    if (ghostSlot_) {
+        incoming_ = std::move(*ghostSlot_);
+        *ghostSlot_ = std::move(ghostTail_->next);
+        ghostSlot_ = nullptr;
+        ghostTail_ = nullptr;
+        relayout();
+    }
+    if (!ghostItems_.isEmpty()) {
+        ghostItems_.clear();
+        update();
+    }
+}
+
+void Canvas::endDrop()
+{
+    removeGhost();
+    incoming_.reset();
+    ghostBlocks_.clear();
+    relayout();
 }
 
 // --- Saisie d'une valeur ---

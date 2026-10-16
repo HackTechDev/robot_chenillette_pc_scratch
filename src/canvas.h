@@ -3,6 +3,7 @@
 #include "blockview.h"
 
 #include <QJsonObject>
+#include <QSet>
 #include <QTimer>
 #include <QWidget>
 
@@ -53,6 +54,9 @@ public:
     void setRunning(bool on);
     void setCurrent(const Block *block);
 
+    // Aperçu inséré dans le programme pendant un glisser-déposer (à ne pas sauvegarder)
+    bool hasGhost() const { return ghostSlot_ != nullptr; }
+
 signals:
     void runRequested(const Block *first);  // clic sur un script
     void changed();
@@ -96,6 +100,9 @@ private:
     void stepValue(Block *block, int steps);
     int itemAt(const QPointF &pos) const;
     Snap findSnap(BlockPtr &stack, const QPointF &topLeft) const;
+    void showGhost(const Snap &snap);
+    void removeGhost();  // incoming_ redevient propriétaire de la pile
+    void endDrop();
     void drop(BlockPtr stack, const QPointF &topLeft);
     void addScript(const QPointF &pos, BlockPtr top);
     void pruneScripts();  // jamais pendant un glisser : un Item peut pointer sur Script::top
@@ -119,7 +126,12 @@ private:
     QTimer wheelCommit_;  // regroupe les crans de molette en une seule étape d'annulation
     BlockPtr incoming_;  // pile qui survole la zone pendant un glisser-déposer
     QPointF incomingHot_;
-    Snap snap_;
+    // Aperçu : la pile survolante est insérée à sa place (les blocs suivants descendent) ;
+    // au-dessus d'un script, elle est seulement dessinée (ghostItems_)
+    BlockPtr *ghostSlot_ = nullptr;
+    Block *ghostTail_ = nullptr;
+    QList<blockview::Item> ghostItems_;
+    QSet<const Block *> ghostBlocks_;
     QLineEdit *editor_;
     Block *edited_ = nullptr;
     QList<QJsonObject> history_;

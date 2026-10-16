@@ -23,12 +23,13 @@ Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.c
 ## Utilisation
 
 1. **Connecter** le robot (en haut) : comme dans la télécommande, BatMobile est présélectionné, et appairé automatiquement s'il ne l'est pas encore. Sans robot, le programme s'exécute quand même : seule la scène bouge.
-2. **Glisser** les blocs de la palette (à gauche) vers la zone de programme et les emboîter sous **quand ▶ est cliqué**. Un trait blanc montre où le bloc va s'accrocher.
+2. **Glisser** les blocs de la palette (à gauche) vers la zone de programme et les emboîter sous **quand ▶ est cliqué**. Pendant le glisser, un aperçu gris montre où la pile va s'accrocher (les blocs suivants se décalent pour lui faire de la place).
 3. **▶** exécute le script qui commence par **quand ▶ est cliqué** (le plus haut s'il y en a plusieurs). **■** ou **Échap** arrête le programme et le robot.
+4. **⏭ Pas à pas** (F10) : le programme s'arrête avant chaque bloc d'action, entouré de jaune, robot à l'arrêt. **⏭** exécute ce bloc puis s'arrête avant le suivant, **▶** (F5) continue normalement, **■** arrête. Les blocs « répéter » sont traversés sans arrêt.
 
 Dans la zone de programme :
 
-- clic sur un nombre : le modifier (virgule ou point) ; **molette** sur un nombre : l'augmenter ou le diminuer (durées : 0,1 s par cran jusqu'à 2 s, puis 0,5 s ; nombres de tours et vitesse : 1 par cran) ;
+- clic sur un nombre : le modifier (virgule ou point ; durées au centième, ex. 0,25 s) ; **molette** sur un nombre : l'augmenter ou le diminuer (durées : 0,1 s par cran jusqu'à 2 s, puis 0,5 s ; nombres de tours et vitesse : 1 par cran) ;
 - clic sur un script : l'exécuter seul ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
 - clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent) ;
@@ -41,6 +42,18 @@ Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne p
 **↶ / ↷** (Ctrl+Z / Ctrl+Y ou Ctrl+Maj+Z) : annuler ou rétablir la dernière modification (ajout, déplacement, suppression, valeur, rangement), jusqu'à 200 étapes ; plusieurs crans de molette d'affilée comptent pour une seule étape. Indisponible pendant l'exécution.
 
 **Nouveau**, **Ouvrir…**, **Enregistrer…** (Ctrl+N / Ctrl+O / Ctrl+S) : les programmes sont des fichiers `.batmobile` (JSON).
+
+**Exemples ▾** : programmes tout faits, à ouvrir puis modifier (Enregistrer… en fait une copie) :
+
+| Exemple | Ce qu'il fait |
+|---------|---------------|
+| Carré | répéter 4 fois : avancer 1 s, pivoter ↻ 0,5 s |
+| Aller-retour | avancer, demi-tour (pivoter 1 s), revenir, demi-tour |
+| Slalom | zigzag de trois virages (pivots de 0,25 s = 45°) |
+| Attraper un objet | ouvrir la pince, avancer, fermer, lever la tête, reculer, reposer |
+| Danse | vitesse 6, répéter indéfiniment : gauche, droite, tête haut, tête bas (■ pour arrêter) |
+
+Les angles sont calculés pour la scène (0,5 s ≈ 90° à la vitesse par défaut) : sur le vrai robot, ajuster les durées.
 
 **Sauvegarde automatique** : le programme en cours, enregistré ou non, est sauvegardé une seconde après chaque modification et à la fermeture, dans `~/.local/share/batmobile_scratch/autosave.batmobile`. Il est rouvert au lancement suivant (même après un plantage), avec son nom de fichier et l'astérisque s'il n'était pas enregistré. Quitter ne demande donc plus d'enregistrer.
 

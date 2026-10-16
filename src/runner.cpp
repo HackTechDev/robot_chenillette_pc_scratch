@@ -17,12 +17,24 @@ Runner::Runner(Link &link, QObject *parent) : QObject(parent), link_(link)
     connect(&timer_, &QTimer::timeout, this, &Runner::onTimeout);
 }
 
-void Runner::start(const Block *first)
+void Runner::start(const Block *first, bool stepByStep)
 {
     stop();
     running_ = true;
+    stepByStep_ = stepByStep;
+    acted_ = true;  // pas à pas : arrêt avant le premier bloc d'action
     frames_ = {{first, nullptr, 0, waits_}};
     send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
+    step();
+}
+
+void Runner::resume(bool stepByStep)
+{
+    if (!paused_)
+        return;
+    paused_ = false;
+    stepByStep_ = stepByStep;
+    acted_ = false;
     step();
 }
 
@@ -30,6 +42,7 @@ void Runner::stop()
 {
     if (!running_)
         return;
+    paused_ = false;
     timer_.stop();
     frames_.clear();
     moving_ = false;
@@ -86,6 +99,16 @@ void Runner::step()
         }
 
         const Block *b = f.next;
+        const bool action = b->kind != Kind::Start && b->kind != Kind::Repeat && b->kind != Kind::Forever;
+        if (action && stepByStep_) {
+            if (acted_) {
+                paused_ = true;
+                emit current(b);
+                emit paused(b);
+                return;
+            }
+            acted_ = true;
+        }
         f.next = b->next.get();
         emit current(b);
         switch (b->kind) {

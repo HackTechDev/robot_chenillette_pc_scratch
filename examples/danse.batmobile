@@ -1,0 +1,40 @@
+{
+    "format": "batmobile-scratch",
+    "version": 1,
+    "scripts": [
+        {
+            "x": 40,
+            "y": 40,
+            "blocks": [
+                {
+                    "kind": "start"
+                },
+                {
+                    "kind": "speed",
+                    "value": 6
+                },
+                {
+                    "kind": "forever",
+                    "value": [
+                        {
+                            "kind": "left",
+                            "value": 0.3
+                        },
+                        {
+                            "kind": "right",
+                            "value": 0.3
+                        },
+                        {
+                            "kind": "head_up",
+                            "value": 0.3
+                        },
+                        {
+                            "kind": "head_down",
+                            "value": 0.3
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

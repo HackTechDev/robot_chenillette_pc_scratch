@@ -26,7 +26,7 @@ public:
     Canvas &canvas() { return *canvas_; }
     Runner &runner() { return runner_; }
     void setConnected(bool on);
-    void run(const Block *first);
+    void run(const Block *first, bool stepByStep = false);
 
 protected:
     void closeEvent(QCloseEvent *e) override;
@@ -44,8 +44,12 @@ private:
     void onLost();
 
     // Programme
+    void runOrContinue(bool stepByStep);  // ▶ / ⏭ : démarre, ou reprend après une pause
+    void setRunButtonsEnabled(bool on);
+    void onPaused();
     void onFinished();
     void newProgram();
+    void openExample(const QString &title, const QString &path);
     void openProgram();
     bool saveProgram();
     void setModified(bool on);
@@ -62,12 +66,14 @@ private:
     Pairing *pairing_ = nullptr;
     bool modified_ = false;
     QString fileName_;
+    QString untitled_ = QStringLiteral("sans titre");  // titre sans fichier (ex. un exemple)
     QTimer autosaveTimer_;
 
     QComboBox *deviceBox_;
     QPushButton *btButton_;
     QLabel *status_;
     QPushButton *runButton_;
+    QPushButton *stepButton_;
     QPushButton *undoButton_;
     QPushButton *redoButton_;
     Palette *palette_;

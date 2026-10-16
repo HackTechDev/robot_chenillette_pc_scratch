@@ -29,6 +29,17 @@ qt_add_executable(batmobile_scratch
 )
 target_link_libraries(batmobile_scratch PRIVATE batmobile_bluez Qt6::Widgets)
 
+# Programmes d'exemple, intégrés à l'exécutable (:/examples/…)
+qt_add_resources(batmobile_scratch examples
+    PREFIX "/"
+    FILES
+        examples/carre.batmobile
+        examples/aller_retour.batmobile
+        examples/slalom.batmobile
+        examples/attraper.batmobile
+        examples/danse.batmobile
+)
+
 # Appairage en ligne de commande
 qt_add_executable(bt_pairing src/bt_pairing.cpp)
 target_link_libraries(bt_pairing PRIVATE batmobile_bluez)

@@ -1,0 +1,43 @@
+{
+    "format": "batmobile-scratch",
+    "version": 1,
+    "scripts": [
+        {
+            "x": 40,
+            "y": 40,
+            "blocks": [
+                {
+                    "kind": "start"
+                },
+                {
+                    "kind": "claw_open",
+                    "value": 1
+                },
+                {
+                    "kind": "forward",
+                    "value": 1
+                },
+                {
+                    "kind": "claw_close",
+                    "value": 1
+                },
+                {
+                    "kind": "head_up",
+                    "value": 0.5
+                },
+                {
+                    "kind": "backward",
+                    "value": 1
+                },
+                {
+                    "kind": "head_down",
+                    "value": 0.5
+                },
+                {
+                    "kind": "claw_open",
+                    "value": 1
+                }
+            ]
+        }
+    ]
+}

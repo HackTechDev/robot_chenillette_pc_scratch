@@ -17,6 +17,7 @@
 #include <QJsonDocument>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -32,6 +33,16 @@ namespace {
 
 const QString FileFilter = QStringLiteral("Programmes BatMobile (*.batmobile);;Tous les fichiers (*)");
 const QString FileSuffix = QStringLiteral(".batmobile");
+// Menu Exemples : titre, fichier dans les ressources
+const QList<QPair<QString, QString>> Examples = {
+    {QStringLiteral("Carré"), QStringLiteral(":/examples/carre.batmobile")},
+    {QStringLiteral("Aller-retour"), QStringLiteral(":/examples/aller_retour.batmobile")},
+    {QStringLiteral("Slalom"), QStringLiteral(":/examples/slalom.batmobile")},
+    {QStringLiteral("Attraper un objet"), QStringLiteral(":/examples/attraper.batmobile")},
+    {QStringLiteral("Danse (sans fin, ■ pour arrêter)"), QStringLiteral(":/examples/danse.batmobile")},
+};
+
+const QString UntitledName = QStringLiteral("sans titre");
 const QString AutosaveFormat = QStringLiteral("batmobile-scratch-autosave");
 constexpr int AutosaveDelayMs = 1000;
 
@@ -55,6 +66,8 @@ QPushButton#small:hover { border-color: #888; }
 QPushButton#small:disabled { color: #555; border-color: #333; }
 QPushButton#run { background: #4caf50; border-radius: 20px; font-size: 20px; font-weight: bold; }
 QPushButton#run:disabled { background: #2e5e30; color: #8a8a8a; }
+QPushButton#step { background: #4C97FF; border-radius: 20px; font-size: 18px; font-weight: bold; }
+QPushButton#step:disabled { background: #2b4f80; color: #8a8a8a; }
 QPushButton#stop { background: #e53935; border-radius: 20px; font-size: 18px; font-weight: bold; }
 QPushButton#quit { border: 1px solid #555; border-radius: 16px; color: #888; font-size: 15px; font-weight: bold; }
 QPushButton#quit:hover { border-color: #e53935; color: #e53935; }
@@ -107,9 +120,13 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(btButton_, &QPushButton::clicked, this, &Window::toggleConnection);
 
     runButton_ = button(QStringLiteral("▶"), QStringLiteral("run"),
-                        QStringLiteral("Exécuter le script « quand ▶ est cliqué »"));
+                        QStringLiteral("Exécuter le script « quand ▶ est cliqué » (F5)"));
     runButton_->setFixedSize(56, 40);
-    connect(runButton_, &QPushButton::clicked, this, [this] { run(canvas_->startScript()); });
+    connect(runButton_, &QPushButton::clicked, this, [this] { runOrContinue(false); });
+    stepButton_ = button(QStringLiteral("⏭"), QStringLiteral("step"),
+                         QStringLiteral("Pas à pas : exécuter un bloc à la fois (F10)"));
+    stepButton_->setFixedSize(56, 40);
+    connect(stepButton_, &QPushButton::clicked, this, [this] { runOrContinue(true); });
     QPushButton *stop = button(QStringLiteral("■"), QStringLiteral("stop"), QStringLiteral("Arrêter (Échap)"));
     stop->setFixedSize(56, 40);
     connect(stop, &QPushButton::clicked, &runner_, &Runner::stop);
@@ -122,6 +139,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     header->addWidget(btButton_);
     header->addStretch();
     header->addWidget(runButton_);
+    header->addWidget(stepButton_);
     header->addWidget(stop);
 
     status_ = label(QString(), QStringLiteral("hint"));
@@ -138,10 +156,11 @@ Window::Window(QWidget *parent) : QWidget(parent)
     auto *canvasScroll = new QScrollArea;
     canvasScroll->setWidget(canvas_);
     canvasScroll->setWidgetResizable(true);
-    connect(canvas_, &Canvas::runRequested, this, &Window::run);
+    connect(canvas_, &Canvas::runRequested, this, [this](const Block *first) { run(first); });
     connect(canvas_, &Canvas::changed, this, [this] { setModified(canvas_->isModified()); });
     connect(&runner_, &Runner::current, canvas_, &Canvas::setCurrent);
     connect(&runner_, &Runner::finished, this, &Window::onFinished);
+    connect(&runner_, &Runner::paused, this, &Window::onPaused);
     connect(canvas_, &Canvas::historyChanged, this, &Window::updateHistoryButtons);
 
     // Scène : le robot simulé suit les commandes du programme
@@ -191,6 +210,12 @@ Window::Window(QWidget *parent) : QWidget(parent)
             [zoomReset](qreal zoom) { zoomReset->setText(QStringLiteral("%1 %").arg(qRound(zoom * 100))); });
     QPushButton *zoomIn = button(QStringLiteral("+"), QStringLiteral("small"), QStringLiteral("Zoom avant (Ctrl++)"));
     connect(zoomIn, &QPushButton::clicked, canvas_, &Canvas::zoomIn);
+    QPushButton *examples = button(QStringLiteral("Exemples ▾"), QStringLiteral("small"));
+    auto *examplesMenu = new QMenu(examples);
+    for (const auto &[title, path] : Examples)
+        examplesMenu->addAction(title, this, [this, title, path] { openExample(title, path); });
+    connect(examples, &QPushButton::clicked, this,
+            [examples, examplesMenu] { examplesMenu->exec(examples->mapToGlobal(QPoint(0, -examplesMenu->sizeHint().height()))); });
     QPushButton *newButton = button(QStringLiteral("Nouveau"), QStringLiteral("small"));
     connect(newButton, &QPushButton::clicked, this, &Window::newProgram);
     QPushButton *openButton = button(QStringLiteral("Ouvrir…"), QStringLiteral("small"));
@@ -210,6 +235,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     bottom->addWidget(zoomReset);
     bottom->addWidget(zoomIn);
     bottom->addSpacing(12);
+    bottom->addWidget(examples);
     bottom->addWidget(newButton);
     bottom->addWidget(openButton);
     bottom->addWidget(saveButton);
@@ -231,6 +257,8 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(escape, &QShortcut::activated, &runner_, &Runner::stop);
+    connect(new QShortcut(QKeySequence(Qt::Key_F5), this), &QShortcut::activated, this, [this] { runOrContinue(false); });
+    connect(new QShortcut(QKeySequence(Qt::Key_F10), this), &QShortcut::activated, this, [this] { runOrContinue(true); });
     connect(new QShortcut(QKeySequence::New, this), &QShortcut::activated, this, &Window::newProgram);
     connect(new QShortcut(QKeySequence::Open, this), &QShortcut::activated, this, &Window::openProgram);
     connect(new QShortcut(QKeySequence::Save, this), &QShortcut::activated, this, &Window::saveProgram);
@@ -386,7 +414,29 @@ void Window::setConnected(bool on)
 
 // --- Exécution ---
 
-void Window::run(const Block *first)
+void Window::runOrContinue(bool stepByStep)
+{
+    if (!runner_.isPaused())
+        return run(canvas_->startScript(), stepByStep);
+    setRunButtonsEnabled(false);
+    status_->setText(stepByStep ? QStringLiteral("Pas à pas : bloc en cours…")
+                                : QStringLiteral("Programme en cours… (■ ou Échap pour arrêter)"));
+    runner_.resume(stepByStep);
+}
+
+void Window::setRunButtonsEnabled(bool on)
+{
+    runButton_->setEnabled(on);
+    stepButton_->setEnabled(on);
+}
+
+void Window::onPaused()
+{
+    setRunButtonsEnabled(true);
+    status_->setText(QStringLiteral("Pas à pas : ⏭ exécute le bloc entouré · ▶ continue · ■ arrête"));
+}
+
+void Window::run(const Block *first, bool stepByStep)
 {
     if (runner_.isRunning())
         return;
@@ -398,17 +448,17 @@ void Window::run(const Block *first)
     canvas_->setRunning(true);
     canvas_->setFocus();  // termine une saisie en cours
     palette_->setLocked(true);
-    runButton_->setEnabled(false);
+    setRunButtonsEnabled(false);
     status_->setText(connected_ ? QStringLiteral("Programme en cours… (■ ou Échap pour arrêter)")
                                 : QStringLiteral("Simulation, robot non connecté… (■ ou Échap pour arrêter)"));
-    runner_.start(first);
+    runner_.start(first, stepByStep);
 }
 
 void Window::onFinished()
 {
     canvas_->setRunning(false);
     palette_->setLocked(false);
-    runButton_->setEnabled(true);
+    setRunButtonsEnabled(true);
     status_->setText(QStringLiteral("Programme terminé"));
 }
 
@@ -417,7 +467,7 @@ void Window::onFinished()
 void Window::setModified(bool on)
 {
     modified_ = on;
-    const QString name = fileName_.isEmpty() ? QStringLiteral("sans titre") : QFileInfo(fileName_).fileName();
+    const QString name = fileName_.isEmpty() ? untitled_ : QFileInfo(fileName_).fileName();
     setWindowTitle(QStringLiteral("%1 — %2%3").arg(RobotName, name, on ? QStringLiteral(" *") : QString()));
     autosaveTimer_.start();
 }
@@ -432,12 +482,17 @@ void Window::updateHistoryButtons()
 // prochain lancement, même après un plantage
 void Window::autosave()
 {
+    if (canvas_->hasGhost()) {
+        autosaveTimer_.start();  // glisser-déposer en cours : plus tard
+        return;
+    }
     autosaveTimer_.stop();
     const QJsonObject o{
         {QStringLiteral("format"), AutosaveFormat},
         {QStringLiteral("program"), canvas_->save()},
         {QStringLiteral("saved"), canvas_->savedState()},
         {QStringLiteral("fileName"), fileName_},
+        {QStringLiteral("untitled"), untitled_},
     };
     const QString path = autosavePath();
     QDir().mkpath(QFileInfo(path).path());
@@ -459,6 +514,7 @@ void Window::restoreAutosave()
         return;
     canvas_->setSavedState(o[QStringLiteral("saved")].toObject());
     fileName_ = o[QStringLiteral("fileName")].toString();
+    untitled_ = o[QStringLiteral("untitled")].toString(UntitledName);
     status_->setText(QStringLiteral("Programme de la dernière séance retrouvé"));
 }
 
@@ -469,7 +525,23 @@ void Window::newProgram()
         return;
     canvas_->clear();
     fileName_.clear();
+    untitled_ = UntitledName;
     setModified(false);
+}
+
+void Window::openExample(const QString &title, const QString &path)
+{
+    runner_.stop();
+    if (!confirmDiscard())
+        return;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly) || !canvas_->load(QJsonDocument::fromJson(file.readAll()).object()))
+        return;
+    // Pas de fichier : « Enregistrer… » demandera où le copier
+    fileName_.clear();
+    untitled_ = QStringLiteral("%1 (exemple)").arg(title.section(QStringLiteral(" ("), 0, 0));
+    setModified(false);
+    stage_->reset();
 }
 
 void Window::openProgram()

@@ -41,7 +41,8 @@ QFont font();
 // ajoute les blocs à out dans l'ordre de dessin et renvoie la hauteur de la pile.
 qreal layout(BlockPtr &first, QPointF pos, QList<Item> &out);
 QRectF bounds(const QList<Item> &items);
-void paint(QPainter &p, const Item &item, bool highlight = false);
+// ghost : aperçu gris de l'endroit où une pile va être déposée
+void paint(QPainter &p, const Item &item, bool highlight = false, bool ghost = false);
 
 // Glisser-déposer d'une pile : hot = point saisi, relatif au coin haut gauche de la pile
 // scale : zoom de la zone d'origine (taille de l'image glissée)
