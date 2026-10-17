@@ -46,6 +46,7 @@ const QList<QPair<QString, QString>> Examples = {
 };
 
 constexpr int MaxVariableName = 16;
+constexpr int MaxBlockName = 24;
 const QString UntitledName = QStringLiteral("sans titre");
 const QString AutosaveFormat = QStringLiteral("batmobile-scratch-autosave");
 constexpr int AutosaveDelayMs = 1000;
@@ -160,6 +161,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     fitPalette(palette_->minimumWidth());
     connect(palette_, &Palette::widthChanged, this, fitPalette);  // nom de variable plus long
     connect(palette_, &Palette::createVariableRequested, this, &Window::createVariable);
+    connect(palette_, &Palette::createBlockRequested, this, &Window::createBlock);
     connect(palette_, &Palette::deleteVariableRequested, this, [this](const QString &name) {
         if (!canvas_->removeVariable(name))
             QMessageBox::information(this, QStringLiteral("Variable"),
@@ -189,6 +191,9 @@ Window::Window(QWidget *parent) : QWidget(parent)
         updateMonitors();
     });
     connect(&runner_, &Runner::variableChanged, this, &Window::updateMonitors);
+    connect(canvas_, &Canvas::proceduresChanged, palette_, &Palette::setProcedures);
+    runner_.setProcedures([this](const QString &name) { return canvas_->procedure(name); });
+    connect(&runner_, &Runner::error, status_, &QLabel::setText);
     connect(canvas_, &Canvas::changed, this, [this] { setModified(canvas_->isModified()); });
     connect(&runner_, &Runner::current, canvas_, &Canvas::setCurrent);
     connect(&runner_, &Runner::finished, this, &Window::onFinished);
@@ -601,6 +606,25 @@ void Window::createVariable()
     if (!canvas_->addVariable(name))
         QMessageBox::information(this, QStringLiteral("Variable"),
                                  QStringLiteral("La variable « %1 » existe déjà.").arg(name));
+}
+
+void Window::createBlock()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, QStringLiteral("Nouveau bloc"),
+                                               QStringLiteral("Nom du bloc (ex. faire un carré) :"), QLineEdit::Normal,
+                                               QString(), &ok)
+                             .trimmed()
+                             .left(MaxBlockName);
+    if (!ok || name.isEmpty())
+        return;
+    if (!canvas_->addProcedure(name)) {
+        QMessageBox::information(this, QStringLiteral("Mes blocs"),
+                                 QStringLiteral("Le bloc « %1 » existe déjà.").arg(name));
+        return;
+    }
+    status_->setText(QStringLiteral("Empiler les blocs sous « définir %1 », puis utiliser « %1 » depuis la palette")
+                         .arg(name));
 }
 
 void Window::updateMonitors()

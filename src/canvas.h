@@ -53,6 +53,11 @@ public:
     bool addVariable(const QString &name);  // false si le nom existe déjà
     bool removeVariable(const QString &name);  // false si un bloc l'utilise encore
 
+    // Mes blocs : scripts « définir nom »
+    QStringList procedures() const { return procedures_; }
+    const Block *procedure(const QString &name) const;  // le plus haut s'il y en a plusieurs
+    bool addProcedure(const QString &name);  // pose « définir nom » sous les scripts ; false si déjà défini
+
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
     // Script le plus haut commençant par « quand la touche … » pour cette touche (indice keyIndex)
@@ -72,6 +77,7 @@ signals:
     void changed();
     void historyChanged();
     void variablesChanged(const QStringList &names);
+    void proceduresChanged(const QStringList &names);
     void zoomChanged(qreal zoom);
 
 protected:
@@ -124,6 +130,7 @@ private:
     void chooseKey(int item);
     void chooseVariable(int item);
     void setVariables(QStringList names);  // complétée par les noms utilisés dans les scripts
+    void updateProcedures();
     void commitEdit();
     void removeBlock(int item);
     void duplicate(int item);
@@ -152,6 +159,7 @@ private:
     Block *edited_ = nullptr;
     int editedInput_ = 0;
     QStringList variables_;
+    QStringList procedures_;
     QList<QJsonObject> history_;
     int historyIndex_ = 0;
     QJsonObject saved_;

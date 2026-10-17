@@ -18,9 +18,11 @@ public:
 
     void setLocked(bool on);  // pas de glisser pendant l'exécution
     void setVariables(const QStringList &names);
+    void setProcedures(const QStringList &names);  // blocs personnalisés définis
 
 signals:
     void createVariableRequested();
+    void createBlockRequested();
     void deleteVariableRequested(const QString &name);
     void widthChanged(int width);
 
@@ -40,13 +42,21 @@ private:
         qreal y;
     };
 
+    enum ButtonId { CreateVariable, CreateBlock };
+    struct Button {
+        QRectF rect;
+        QString text;
+        ButtonId id = CreateVariable;
+    };
+
     void rebuild();
 
     QStringList variables_;
+    QStringList procedures_;
     std::vector<BlockPtr> templates_;
     QList<blockview::Item> items_;
     QList<Heading> headings_;
-    QRectF createButton_;  // « Créer une variable »
+    QList<Button> buttons_;
     int pressItem_ = -1;
     QPointF pressPos_;
     bool locked_ = false;

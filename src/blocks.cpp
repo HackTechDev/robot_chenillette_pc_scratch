@@ -17,6 +17,7 @@ constexpr QRgb Tools = 0x9966FF;
 constexpr QRgb Control = 0xFFAB19;
 constexpr QRgb Variables = 0xFF8C1A;
 constexpr QRgb Operators = 0x59C059;
+constexpr QRgb MyBlocks = 0xFF6680;
 
 const Spec Specs[] = {
     {Kind::Start, "start", "quand ▶ est cliqué", Events, Shape::Hat, Param::None, 0, 0, 0},
@@ -46,8 +47,10 @@ const Spec Specs[] = {
     {Kind::Multiply, "multiply", "%1 × %2", Operators, Shape::Reporter, Param::Number, 0, 1, 1},
     {Kind::Divide, "divide", "%1 ÷ %2", Operators, Shape::Reporter, Param::Number, 0, 1, 1},
     {Kind::Random, "random", "nombre aléatoire entre %1 et %2", Operators, Shape::Reporter, Param::Number, 0, 1, 10},
+    {Kind::Define, "define", "définir %n", MyBlocks, Shape::Hat, Param::None, 0, 0, 0},
+    {Kind::Call, "call", "%n", MyBlocks, Shape::Stack, Param::None, 0, 0, 0},
 };
-static_assert(std::size(Specs) == size_t(Kind::Random) + 1);
+static_assert(std::size(Specs) == size_t(Kind::Call) + 1);
 
 // Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
 struct KeyDef {

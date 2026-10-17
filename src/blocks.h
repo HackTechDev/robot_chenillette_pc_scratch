@@ -32,12 +32,13 @@ enum class Kind {
     Wait, Repeat, Forever,
     SetVar, ChangeVar, Variable,
     Add, Subtract, Multiply, Divide, Random,
+    Define, Call,  // mes blocs : « définir nom » (chapeau) et l'appel « nom »
 };
 
 struct Spec {
     Kind kind;
     const char *id;    // nom dans les fichiers .batmobile
-    // %1, %2 = entrées ; %v = liste des variables ; %n = nom (variable) en texte
+    // %1, %2 = entrées ; %v = liste des variables ; %n = nom (variable, bloc personnalisé) en texte
     const char *text;
     QRgb color;
     Shape shape;
@@ -78,7 +79,7 @@ struct Block {
 
     Kind kind;
     std::array<Input, 2> inputs;
-    QString name;  // variable
+    QString name;  // variable, ou bloc personnalisé
     BlockPtr next;
     BlockPtr body;
 };

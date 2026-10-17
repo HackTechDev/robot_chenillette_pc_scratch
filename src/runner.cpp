@@ -11,6 +11,8 @@ namespace {
 
 // Durée minimale d'une attente, et pause d'un tour de boucle sans attente
 constexpr int MinWaitMs = 20;
+// Profondeur maximale (boucles et appels de mes blocs imbriqués) : arrête une récursion sans fin
+constexpr int MaxDepth = 1000;
 
 }  // namespace
 
@@ -156,7 +158,7 @@ void Runner::step()
         }
 
         const Block *b = f.next;
-        const bool action = b->spec().shape == Shape::Stack;
+        const bool action = b->spec().shape == Shape::Stack && b->kind != Kind::Call;
         if (action && stepByStep_) {
             if (acted_) {
                 stopRolling();  // en pause, le robot ne doit pas continuer à rouler
@@ -172,6 +174,17 @@ void Runner::step()
         switch (b->kind) {
         case Kind::Start:
         case Kind::KeyHat:
+        case Kind::Define:
+            break;
+        case Kind::Call:
+            if (const Block *def = procedures_ ? procedures_(b->name) : nullptr) {
+                if (frames_.size() >= MaxDepth) {
+                    stop();
+                    emit error(QStringLiteral("Programme arrêté : le bloc « %1 » s'appelle sans fin.").arg(b->name));
+                    return;
+                }
+                frames_.append({def->next.get(), nullptr, 0, waits_});  // f n'est plus valide
+            }
             break;
         case Kind::Repeat:
             if (const int n = int(input(b, 0, Param::Count)); n >= 1)

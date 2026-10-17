@@ -33,62 +33,78 @@ void Palette::setVariables(const QStringList &names)
     rebuild();
 }
 
+void Palette::setProcedures(const QStringList &names)
+{
+    if (names == procedures_)
+        return;
+    procedures_ = names;
+    rebuild();
+}
+
 void Palette::rebuild()
 {
-    // Modèles : catégories fixes, puis Variables (un reporter par variable, mettre / ajouter)
-    std::vector<BlockPtr> blocks;
-    QList<int> sectionStarts;
-    QList<Heading> headings;
+    // Sections : catégories fixes, puis Variables et Mes blocs (bouton de création + modèles)
+    struct Section {
+        Heading heading;
+        Button button;
+        std::vector<BlockPtr> blocks;
+    };
+    std::vector<Section> sections;
     for (const Category &c : categories()) {
-        sectionStarts.append(int(blocks.size()));
-        headings.append({c.name, QColor(c.color), 0});
+        Section &s = sections.emplace_back();
+        s.heading = {c.name, QColor(c.color), 0};
         for (Kind k : c.kinds)
-            blocks.push_back(std::make_unique<Block>(k));
+            s.blocks.push_back(std::make_unique<Block>(k));
     }
-    const int variablesStart = int(blocks.size());
-    for (const QString &name : variables_) {
-        blocks.push_back(std::make_unique<Block>(Kind::Variable));
-        blocks.back()->name = name;
-    }
+    auto named = [](Kind k, const QString &name) {
+        auto b = std::make_unique<Block>(k);
+        b->name = name;
+        return b;
+    };
+    Section &vars = sections.emplace_back();
+    vars.heading = {QStringLiteral("Variables"), QColor(variablesColor()), 0};
+    vars.button = {QRectF(), QStringLiteral("Créer une variable"), CreateVariable};
+    for (const QString &name : variables_)
+        vars.blocks.push_back(named(Kind::Variable, name));
     if (!variables_.isEmpty()) {
-        for (Kind k : {Kind::SetVar, Kind::ChangeVar}) {
-            blocks.push_back(std::make_unique<Block>(k));
-            blocks.back()->name = variables_.first();
-        }
+        vars.blocks.push_back(named(Kind::SetVar, variables_.first()));
+        vars.blocks.push_back(named(Kind::ChangeVar, variables_.first()));
     }
+    Section &procs = sections.emplace_back();
+    procs.heading = {QStringLiteral("Mes blocs"), QColor(specOf(Kind::Call).color), 0};
+    procs.button = {QRectF(), QStringLiteral("Créer un bloc"), CreateBlock};
+    for (const QString &name : procedures_)
+        procs.blocks.push_back(named(Kind::Call, name));
 
-    templates_ = std::move(blocks);  // les Item gardent l'adresse de leur pointeur : plus de réallocation
+    // Les Item gardent l'adresse de leur pointeur : templates_ n'est plus modifié ensuite
+    templates_.clear();
+    for (Section &s : sections) {
+        for (BlockPtr &b : s.blocks)
+            templates_.push_back(std::move(b));
+    }
     items_.clear();
     headings_.clear();
+    buttons_.clear();
     pressItem_ = -1;
     qreal y = Margin;
-    for (int i = 0; i < int(templates_.size()); ++i) {
-        const int section = sectionStarts.indexOf(i);
-        if (section >= 0) {
-            if (section > 0)
-                y += SectionGap;
-            headings_.append(headings[section]);
-            headings_.last().y = y;
-            y += HeadingH;
-        }
-        if (i == variablesStart) {
+    size_t next = 0;
+    QRectF r;
+    for (const Section &s : sections) {
+        if (&s != &sections.front())
             y += SectionGap;
-            headings_.append({QStringLiteral("Variables"), QColor(variablesColor()), y});
-            y += HeadingH;
-            createButton_ = QRectF(Margin, y, ButtonW, ButtonH);
+        headings_.append(s.heading);
+        headings_.last().y = y;
+        y += HeadingH;
+        if (!s.button.text.isEmpty()) {
+            buttons_.append(s.button);
+            buttons_.last().rect = QRectF(Margin, y, ButtonW, ButtonH);
+            r |= buttons_.last().rect;
             y += ButtonH + Spacing;
         }
-        y += blockview::layout(templates_[i], QPointF(Margin, y), items_) + Spacing;
+        for (size_t n = 0; n < s.blocks.size(); ++n, ++next)
+            y += blockview::layout(templates_[next], QPointF(Margin, y), items_) + Spacing;
     }
-    if (variablesStart == int(templates_.size())) {
-        // Aucune variable : section avec seulement le bouton
-        y += SectionGap;
-        headings_.append({QStringLiteral("Variables"), QColor(variablesColor()), y});
-        y += HeadingH;
-        createButton_ = QRectF(Margin, y, ButtonW, ButtonH);
-        y += ButtonH + Spacing;
-    }
-    const QRectF r = blockview::bounds(items_) | createButton_;
+    r |= blockview::bounds(items_);
     const int w = int(r.right() + Margin);
     const bool widthChange = w != minimumWidth();
     setMinimumSize(w, int(y + Margin));
@@ -123,12 +139,14 @@ void Palette::paintEvent(QPaintEvent *)
     for (const blockview::Item &it : items_)
         blockview::paint(p, it);
 
-    p.setPen(QPen(QColor(0x55, 0x55, 0x55), 1));
-    p.setBrush(QColor(0x2A, 0x2A, 0x2A));
-    p.drawRoundedRect(createButton_, 6, 6);
     p.setFont(f);
-    p.setPen(QColor(0xDD, 0xDD, 0xDD));
-    p.drawText(createButton_, Qt::AlignCenter, QStringLiteral("Créer une variable"));
+    for (const Button &b : buttons_) {
+        p.setPen(QPen(QColor(0x55, 0x55, 0x55), 1));
+        p.setBrush(QColor(0x2A, 0x2A, 0x2A));
+        p.drawRoundedRect(b.rect, 6, 6);
+        p.setPen(QColor(0xDD, 0xDD, 0xDD));
+        p.drawText(b.rect, Qt::AlignCenter, b.text);
+    }
 
     if (trashHover_) {
         // Pile survolant la palette : elle sera supprimée
@@ -145,8 +163,10 @@ void Palette::mousePressEvent(QMouseEvent *e)
     pressItem_ = -1;
     if (e->button() != Qt::LeftButton)
         return;
-    if (createButton_.contains(e->position()))
-        return emit createVariableRequested();
+    for (const Button &b : buttons_) {
+        if (b.rect.contains(e->position()))
+            return b.id == CreateVariable ? emit createVariableRequested() : emit createBlockRequested();
+    }
     if (locked_)
         return;
     for (int i = 0; i < items_.size(); ++i) {

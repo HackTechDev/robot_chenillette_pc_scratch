@@ -7,6 +7,8 @@
 #include <QObject>
 #include <QTimer>
 
+#include <functional>
+
 class Link;
 
 // Exécute un script pas à pas dans la boucle d'événements (pas de thread). Un bloc
@@ -35,11 +37,15 @@ public:
     void resetVariables();
     double evaluate(const Block *reporter);  // valeur d'un reporter seul (clic dessus)
 
+    // Mes blocs : script « définir nom » à exécuter pour un appel (nullptr si inconnu)
+    void setProcedures(std::function<const Block *(const QString &)> lookup) { procedures_ = std::move(lookup); }
+
 signals:
     void current(const Block *block);  // nullptr à la fin
     void sent(char cmd);               // commande envoyée (ou simulée)
     void paused(const Block *next);    // pas à pas : en attente avant ce bloc
     void variableChanged(const QString &name, double value);
+    void error(const QString &message);  // programme arrêté (ex. appels sans fin)
     void finished();
 
 private:
@@ -64,6 +70,7 @@ private:
     QTimer timer_;
     QList<Frame> frames_;
     QHash<QString, double> vars_;
+    std::function<const Block *(const QString &)> procedures_;
     quint64 waits_ = 0;  // nombre d'attentes depuis le début
     bool moving_ = false;  // commande envoyée, stop à envoyer à la fin de l'attente
     bool rolling_ = false; // « démarrer … » envoyé : le robot bouge jusqu'au prochain stop

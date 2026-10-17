@@ -58,6 +58,7 @@ void Canvas::clear()
     addScript(FirstScript, std::make_unique<Block>(Kind::Start));
     setVariables({});
     relayout();
+    updateProcedures();
     resetHistory();
 }
 
@@ -130,6 +131,7 @@ void Canvas::edited()
     if (history_.size() > MaxHistory)
         history_.removeFirst();
     historyIndex_ = history_.size() - 1;
+    updateProcedures();
     emit changed();
     emit historyChanged();
 }
@@ -155,6 +157,50 @@ void Canvas::restore(const QJsonObject &o)
         names.append(v.toString());
     setVariables(names);
     relayout();
+    updateProcedures();
+}
+
+void Canvas::updateProcedures()
+{
+    // Dans l'ordre des scripts, de haut en bas
+    std::vector<const Script *> order;
+    for (const auto &s : scripts_) {
+        if (s->top && s->top->kind == Kind::Define && !s->top->name.isEmpty())
+            order.push_back(s.get());
+    }
+    std::stable_sort(order.begin(), order.end(), [](const Script *a, const Script *b) { return a->pos.y() < b->pos.y(); });
+    QStringList names;
+    for (const Script *s : order) {
+        if (!names.contains(s->top->name))
+            names.append(s->top->name);
+    }
+    if (names == procedures_)
+        return;
+    procedures_ = names;
+    emit proceduresChanged(procedures_);
+}
+
+const Block *Canvas::procedure(const QString &name) const
+{
+    return topScript([&name](const Block *top) { return top->kind == Kind::Define && top->name == name; });
+}
+
+bool Canvas::addProcedure(const QString &name)
+{
+    if (name.isEmpty() || procedure(name))
+        return false;
+    commitEdit();
+    // Sous tous les scripts, à gauche
+    const QRectF r = blockview::bounds(items_);
+    auto define = std::make_unique<Block>(Kind::Define);
+    define->name = name;
+    const QPointF pos(FirstScript.x(), items_.isEmpty() ? FirstScript.y() : r.bottom() + 2 * ArrangeGap);
+    addScript(pos, std::move(define));
+    relayout();
+    edited();
+    if (QScrollArea *area = scrollArea())
+        area->ensureVisible(int(pos.x() * zoom_), int((pos.y() + blockview::RowH) * zoom_), 50, int(100 * zoom_));
+    return true;
 }
 
 void Canvas::setVariables(QStringList names)

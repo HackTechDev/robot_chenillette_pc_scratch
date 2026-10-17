@@ -52,6 +52,7 @@ private:
     void onPaused();
     void onFinished();
     void createVariable();
+    void createBlock();
     void updateMonitors();
     void showValue(const Block *reporter);
     void programLoaded();

@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 14, 16, 17).
+Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2 à 8, 10 à 14, 16, 17).
 
 ## Priorité
 
@@ -17,12 +17,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 ### 9. Commentaires
 
 Notes jaunes à poser à côté des scripts (texte libre, déplaçables, enregistrées dans le fichier `.batmobile` et l'historique d'annulation).
-
-## Nouveaux blocs
-
-### 13. Mes blocs
-
-Définir un bloc personnalisé (« faire un carré ») réutilisable dans le programme.
 
 ## Robot
 
