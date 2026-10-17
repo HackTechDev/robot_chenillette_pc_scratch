@@ -23,7 +23,7 @@ Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.c
 ## Utilisation
 
 1. **Connecter** le robot (en haut) : comme dans la télécommande, BatMobile est présélectionné, et appairé automatiquement s'il ne l'est pas encore. Sans robot, le programme s'exécute quand même : seule la scène bouge.
-2. **Glisser** les blocs de la palette (à gauche) vers la zone de programme et les emboîter sous **quand ▶ est cliqué**. Pendant le glisser, un aperçu gris montre où la pile va s'accrocher (les blocs suivants se décalent pour lui faire de la place).
+2. **Glisser** les blocs de la palette (à gauche ; clic sur le titre d'une catégorie pour la replier ou la déplier, champ **🔍 Rechercher un bloc** pour filtrer par texte, sans tenir compte des accents ni des majuscules) vers la zone de programme et les emboîter sous **quand ▶ est cliqué**. Pendant le glisser, un aperçu gris montre où la pile va s'accrocher (les blocs suivants se décalent pour lui faire de la place).
 3. **▶** exécute le script qui commence par **quand ▶ est cliqué** (le plus haut s'il y en a plusieurs). **■** ou **Échap** arrête le programme et le robot.
 4. **⏭ Pas à pas** (F10) : le programme s'arrête avant chaque bloc d'action, entouré de jaune, robot à l'arrêt. **⏭** exécute ce bloc puis s'arrête avant le suivant, **▶** (F5) continue normalement, **■** arrête. Les blocs « répéter » sont traversés sans arrêt.
 
@@ -33,7 +33,7 @@ Dans la zone de programme :
 - clic sur un script : l'exécuter seul, comme dans Scratch ; **robot connecté, il faut un double-clic** (un clic involontaire ne fait pas bouger le robot) ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
 - **sélection** : un clic sélectionne un bloc et ceux qui le suivent (halo bleu), **Ctrl+clic** en ajoute ou en retire, **Ctrl+A** sélectionne tous les scripts, un clic sur le fond désélectionne ; **Ctrl+C** / **Ctrl+X** / **Ctrl+V** copient, coupent et collent la sélection (y compris d'un programme à un autre : les variables suivent), le collage se fait sous la souris ; **Suppr** supprime la sélection (annulable avec ↶) ;
-- clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) **Copier** ou **Supprimer le bloc** (les suivants remontent) ;
+- clic droit sur un bloc : **Dupliquer** (le bloc et les suivants), **Copier** ou **Supprimer le bloc** (les suivants remontent) ;
 - clic droit sur le fond : **Ajouter un commentaire**, **Coller**, **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (scripts et commentaires ; annulables avec ↶) ;
 - **commentaires** (notes jaunes) : clic droit sur le fond ou sur un bloc → **Ajouter un commentaire** (à droite du bloc) ; clic sur la note pour écrire, clic ailleurs pour valider ; glisser la note pour la déplacer, son coin bas-droit pour la redimensionner ; clic droit → **Supprimer le commentaire**. Les notes sont enregistrées avec le programme et s'annulent avec ↶ ; elles ne sont pas rattachées aux blocs (elles ne suivent pas un script déplacé) ;
 - glisser le fond (ou bouton du milieu) : déplacer la vue ;

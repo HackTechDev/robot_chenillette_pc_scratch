@@ -2,6 +2,7 @@
 
 #include "blockview.h"
 
+#include <QSet>
 #include <QWidget>
 
 #include <vector>
@@ -19,6 +20,9 @@ public:
     void setLocked(bool on);  // pas de glisser pendant l'exécution
     void setVariables(const QStringList &names);
     void setProcedures(const QList<Procedure> &procedures);  // blocs personnalisés définis
+    // Recherche : seuls les blocs dont le texte contient filter (sans accents ni majuscules)
+    void setFilter(const QString &filter);
+    void toggleSection(const QString &name);  // replier / déplier une catégorie
 
 signals:
     void createVariableRequested();
@@ -40,6 +44,7 @@ private:
         QString name;
         QColor color;
         qreal y;
+        bool collapsed = false;
     };
 
     enum ButtonId { CreateVariable, CreateBlock };
@@ -57,6 +62,8 @@ private:
     QList<blockview::Item> items_;
     QList<Heading> headings_;
     QList<Button> buttons_;
+    QString filter_;
+    QSet<QString> collapsed_;  // catégories repliées
     int pressItem_ = -1;
     QPointF pressPos_;
     bool locked_ = false;

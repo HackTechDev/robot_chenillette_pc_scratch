@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026 (faits : 21, 22, 23, 32).
+Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026 (faits : 21, 22, 23, 32, 33).
 
 Ordre conseillé : **1** (tout en dépend), puis **25** et **26**, et **28** si l'essai réel montre une dérive.
 
@@ -57,10 +57,6 @@ Après une perte de liaison, retenter la connexion au même robot (avec un messa
 Le firmware interpréterait les blocs lui-même : plus de délai Bluetooth, et le robot fonctionne sans PC une fois lancé. Gros chantier (format compact, interpréteur dans la mémoire de l'Arduino).
 
 ## Confort
-
-### 33. Palette
-
-Catégories repliables et champ de recherche : la palette devient longue (Mouvement compte 14 blocs).
 
 ### 34. Commentaires attachés à un bloc
 

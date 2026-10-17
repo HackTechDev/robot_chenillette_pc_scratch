@@ -96,6 +96,7 @@ QPushButton#quit { border: 1px solid #555; border-radius: 16px; color: #888; fon
 QPushButton#quit:hover { border-color: #e53935; color: #e53935; }
 QMessageBox QPushButton { border: 1px solid #555; border-radius: 6px; padding: 6px 16px; min-width: 60px; }
 QScrollArea { border: 1px solid #333; }
+QLineEdit#search { background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 5px; }
 )";
 
 QLabel *label(const QString &text, const QString &name)
@@ -169,12 +170,18 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     // Palette à gauche, zone de programme à droite
     palette_ = new Palette;
+    auto *search = new QLineEdit;
+    search->setObjectName(QStringLiteral("search"));
+    search->setPlaceholderText(QStringLiteral("🔍 Rechercher un bloc"));
+    search->setClearButtonEnabled(true);
+    connect(search, &QLineEdit::textChanged, palette_, &Palette::setFilter);
     auto *paletteScroll = new QScrollArea;
     paletteScroll->setWidget(palette_);
     paletteScroll->setWidgetResizable(true);
     paletteScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto fitPalette = [paletteScroll](int width) {
+    auto fitPalette = [paletteScroll, search](int width) {
         paletteScroll->setFixedWidth(width + paletteScroll->verticalScrollBar()->sizeHint().width() + 4);
+        search->setFixedWidth(paletteScroll->width());
     };
     fitPalette(palette_->minimumWidth());
     connect(palette_, &Palette::widthChanged, this, fitPalette);  // nom de variable plus long
@@ -248,7 +255,11 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     auto *workspace = new QHBoxLayout;
     workspace->setSpacing(0);
-    workspace->addWidget(paletteScroll);
+    auto *paletteCol = new QVBoxLayout;
+    paletteCol->setSpacing(6);
+    paletteCol->addWidget(search);
+    paletteCol->addWidget(paletteScroll, 1);
+    workspace->addLayout(paletteCol);
     workspace->addWidget(canvasScroll, 1);
     workspace->addLayout(stageCol);
 

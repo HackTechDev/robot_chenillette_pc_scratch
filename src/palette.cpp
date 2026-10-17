@@ -17,6 +17,28 @@ constexpr qreal SectionGap = 12;
 constexpr qreal ButtonH = 30;
 constexpr qreal ButtonW = 170;
 
+// Pour la recherche : minuscules, sans accents (« Pivoter » trouve « pivoter », « tete » trouve « tête »)
+QString simplified(const QString &text)
+{
+    QString out;
+    for (const QChar c : text.normalized(QString::NormalizationForm_D)) {
+        if (c.category() != QChar::Mark_NonSpacing)
+            out.append(c.toLower());
+    }
+    return out;
+}
+
+// Texte affiché d'un modèle de la palette
+QString label(const Block *b)
+{
+    QString text = QString::fromUtf8(b->spec().text);
+    text.replace(QLatin1String("%n"), b->name).replace(QLatin1String("%v"), b->name).replace(QLatin1String("%t"), b->text);
+    text.remove(QLatin1String("%1")).remove(QLatin1String("%2"));
+    if (b->kind == Kind::Define || b->kind == Kind::Call)
+        text += QLatin1Char(' ') + b->params.join(QLatin1Char(' '));
+    return text;
+}
+
 }  // namespace
 
 Palette::Palette(QWidget *parent) : QWidget(parent)
@@ -38,6 +60,22 @@ void Palette::setProcedures(const QList<Procedure> &procedures)
     if (procedures == procedures_)
         return;
     procedures_ = procedures;
+    rebuild();
+}
+
+void Palette::setFilter(const QString &filter)
+{
+    const QString f = simplified(filter.trimmed());
+    if (f == filter_)
+        return;
+    filter_ = f;
+    rebuild();
+}
+
+void Palette::toggleSection(const QString &name)
+{
+    if (!collapsed_.remove(name))
+        collapsed_.insert(name);
     rebuild();
 }
 
@@ -91,25 +129,48 @@ void Palette::rebuild()
     headings_.clear();
     buttons_.clear();
     pressItem_ = -1;
+
+    // Largeur : celle de tous les modèles, pour qu'elle ne change pas pendant une recherche
+    QRectF r(Margin, 0, ButtonW, 1);
+    for (BlockPtr &b : templates_) {
+        QList<blockview::Item> tmp;
+        blockview::layout(b, QPointF(Margin, 0), tmp);
+        r |= blockview::bounds(tmp);
+    }
+
     qreal y = Margin;
     size_t next = 0;
-    QRectF r;
+    const bool searching = !filter_.isEmpty();
+    bool firstSection = true;
     for (const Section &s : sections) {
-        if (&s != &sections.front())
+        const size_t first = next;
+        next += s.blocks.size();
+        // Recherche : seulement les blocs trouvés, et leurs catégories ; sinon catégories repliables
+        QList<size_t> shown;
+        for (size_t n = first; n < next; ++n) {
+            if (!searching || simplified(label(templates_[n].get())).contains(filter_))
+                shown.append(n);
+        }
+        if (searching && shown.isEmpty())
+            continue;
+        const bool collapsed = !searching && collapsed_.contains(s.heading.name);
+        if (!firstSection)
             y += SectionGap;
+        firstSection = false;
         headings_.append(s.heading);
         headings_.last().y = y;
+        headings_.last().collapsed = collapsed;
         y += HeadingH;
-        if (!s.button.text.isEmpty()) {
+        if (collapsed)
+            continue;
+        if (!s.button.text.isEmpty() && !searching) {
             buttons_.append(s.button);
             buttons_.last().rect = QRectF(Margin, y, ButtonW, ButtonH);
-            r |= buttons_.last().rect;
             y += ButtonH + Spacing;
         }
-        for (size_t n = 0; n < s.blocks.size(); ++n, ++next)
-            y += blockview::layout(templates_[next], QPointF(Margin, y), items_) + Spacing;
+        for (const size_t n : shown)
+            y += blockview::layout(templates_[n], QPointF(Margin, y), items_) + Spacing;
     }
-    r |= blockview::bounds(items_);
     const int w = int(r.right() + Margin);
     const bool widthChange = w != minimumWidth();
     setMinimumSize(w, int(y + Margin));
@@ -139,7 +200,14 @@ void Palette::paintEvent(QPaintEvent *)
         p.drawEllipse(QRectF(Margin, h.y + 6, 12, 12));
         p.setFont(f);
         p.setPen(QColor(0xBB, 0xBB, 0xBB));
-        p.drawText(QRectF(Margin + 20, h.y, width(), 24), Qt::AlignLeft | Qt::AlignVCenter, h.name);
+        // ▾ dépliée, ▸ repliée (clic sur le titre)
+        const QString arrow = filter_.isEmpty() ? (h.collapsed ? QStringLiteral("▸ ") : QStringLiteral("▾ ")) : QString();
+        p.drawText(QRectF(Margin + 20, h.y, width(), 24), Qt::AlignLeft | Qt::AlignVCenter, arrow + h.name);
+    }
+    if (headings_.isEmpty()) {
+        p.setPen(QColor(0x88, 0x88, 0x88));
+        p.drawText(rect().adjusted(Margin, Margin, -Margin, 0), Qt::AlignTop | Qt::AlignHCenter | Qt::TextWordWrap,
+                   QStringLiteral("Aucun bloc trouvé"));
     }
     for (const blockview::Item &it : items_)
         blockview::paint(p, it);
@@ -171,6 +239,12 @@ void Palette::mousePressEvent(QMouseEvent *e)
     for (const Button &b : buttons_) {
         if (b.rect.contains(e->position()))
             return b.id == CreateVariable ? emit createVariableRequested() : emit createBlockRequested();
+    }
+    if (filter_.isEmpty()) {
+        for (const Heading &h : headings_) {
+            if (QRectF(0, h.y, width(), HeadingH).contains(e->position()))
+                return toggleSection(h.name);
+        }
     }
     if (locked_)
         return;
