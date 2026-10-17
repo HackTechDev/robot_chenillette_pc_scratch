@@ -108,13 +108,66 @@ QPainterPath reporterPath(qreal w, qreal h)
     return p;
 }
 
+// Condition (vrai / faux) : hexagone, pointes à gauche et à droite
+QPainterPath booleanPath(const QRectF &r)
+{
+    const qreal t = r.height() / 2;
+    QPainterPath p;
+    p.moveTo(r.left(), r.center().y());
+    p.lineTo(r.left() + t, r.top());
+    p.lineTo(r.right() - t, r.top());
+    p.lineTo(r.right(), r.center().y());
+    p.lineTo(r.right() - t, r.bottom());
+    p.lineTo(r.left() + t, r.bottom());
+    p.closeSubpath();
+    return p;
+}
+
+// Si … alors / sinon : deux corps séparés par la ligne « sinon »
+QPainterPath elsePath(qreal w, qreal rowH, qreal inner1, qreal inner2)
+{
+    const qreal bottom1 = rowH + inner1;
+    const qreal top2 = bottom1 + ElseH;
+    const qreal bottom2 = top2 + inner2;
+    const qreal h = bottom2 + BottomH;
+    QPainterPath p;
+    p.moveTo(0, Radius);
+    p.quadTo(0, 0, Radius, 0);
+    edgeRight(p, 0, 0, w - Radius, true);
+    p.quadTo(w, 0, w, Radius);
+    p.lineTo(w, rowH - Radius);
+    p.quadTo(w, rowH, w - Radius, rowH);
+    edgeLeft(p, ArmW, rowH, ArmW + Radius, true);
+    p.quadTo(ArmW, rowH, ArmW, rowH + Radius);
+    p.lineTo(ArmW, bottom1 - Radius);
+    p.quadTo(ArmW, bottom1, ArmW + Radius, bottom1);
+    edgeRight(p, ArmW, bottom1, w - Radius, true);
+    p.quadTo(w, bottom1, w, bottom1 + Radius);
+    p.lineTo(w, top2 - Radius);
+    p.quadTo(w, top2, w - Radius, top2);
+    edgeLeft(p, ArmW, top2, ArmW + Radius, true);
+    p.quadTo(ArmW, top2, ArmW, top2 + Radius);
+    p.lineTo(ArmW, bottom2 - Radius);
+    p.quadTo(ArmW, bottom2, ArmW + Radius, bottom2);
+    edgeRight(p, ArmW, bottom2, w - Radius, true);
+    p.quadTo(w, bottom2, w, bottom2 + Radius);
+    p.lineTo(w, h - Radius);
+    p.quadTo(w, h, w - Radius, h);
+    edgeLeft(p, 0, h, Radius, true);
+    p.quadTo(0, h, 0, h - Radius);
+    p.closeSubpath();
+    return p;
+}
+
 qreal minWidth(Shape s)
 {
     switch (s) {
     case Shape::Hat: return 120;
     case Shape::C:
-    case Shape::CapC: return 100;
-    case Shape::Reporter: return 40;
+    case Shape::CapC:
+    case Shape::E: return 100;
+    case Shape::Reporter:
+    case Shape::Boolean: return 40;
     case Shape::Stack: break;
     }
     return 60;
@@ -151,7 +204,7 @@ QSizeF measure(const Block *b, const QFontMetricsF &fm);
 // Hauteur de la ligne : de quoi contenir les reporters des entrées
 qreal rowHeight(const Block *b, const QFontMetricsF &fm)
 {
-    const bool reporter = b->spec().shape == Shape::Reporter;
+    const bool reporter = isReporter(b->spec().shape);
     qreal h = reporter ? ReporterH : RowH;
     for (const Input &in : b->inputs) {
         if (in.reporter)
@@ -166,7 +219,8 @@ qreal placeTokens(const Block *b, const QFontMetricsF &fm, qreal left, qreal row
                   std::array<QPointF, 2> *childPos)
 {
     const Spec &s = b->spec();
-    const qreal pad = s.shape == Shape::Reporter ? 8 : Pad;
+    // Hexagone : de quoi loger les pointes
+    const qreal pad = s.shape == Shape::Boolean ? qMax(10.0, rowH / 2) : s.shape == Shape::Reporter ? 8 : Pad;
     qreal x = left + pad;
     bool first = true;
     for (const QString &t : tokens(s)) {
@@ -265,6 +319,20 @@ qreal layout(BlockPtr &first, QPointF pos, QList<Item> &out)
             out[index].height = rowH;
             out[index].path = reporterPath(it.width, rowH);
             break;
+        case Shape::Boolean:
+            out[index].height = rowH;
+            out[index].path = booleanPath(QRectF(0, 0, it.width, rowH));
+            break;
+        case Shape::E: {
+            const qreal inner1 = qMax(MinInner, layout(b->body, pos + QPointF(ArmW, rowH), out));
+            const qreal top2 = rowH + inner1 + ElseH;
+            const qreal inner2 = qMax(MinInner, layout(b->body2, pos + QPointF(ArmW, top2), out));
+            out[index].elseTop = top2;
+            out[index].texts.append({QRectF(pos.x() + Pad, pos.y() + rowH + inner1, 100, ElseH), QStringLiteral("sinon")});
+            out[index].height = top2 + inner2 + BottomH;
+            out[index].path = elsePath(it.width, rowH, inner1, inner2);
+            break;
+        }
         case Shape::C:
         case Shape::CapC: {
             const qreal inner = qMax(MinInner, layout(b->body, pos + QPointF(ArmW, rowH), out));
@@ -317,6 +385,12 @@ void paint(QPainter &p, const Item &item, bool highlight, bool ghost)
         if (item.value[i].isNull())
             continue;
         p.setPen(QPen(border, 1));
+        if (s.param == Param::Bool) {
+            // Condition vide (faux) : hexagone en creux
+            p.setBrush(color.darker(125));
+            p.drawPath(booleanPath(item.value[i]));
+            continue;
+        }
         p.setBrush(Qt::white);
         p.drawRoundedRect(item.value[i], PillH / 2, PillH / 2);
         p.setPen(QColor(0x57, 0x5E, 0x75));

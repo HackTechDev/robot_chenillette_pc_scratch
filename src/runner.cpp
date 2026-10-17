@@ -74,6 +74,12 @@ double Runner::evaluate(const Block *r)
         const double d = arg(1);
         return d == 0 ? 0 : arg(0) / d;
     }
+    case Kind::Less: return arg(0) < arg(1);
+    case Kind::Equal: return std::abs(arg(0) - arg(1)) < 1e-9;
+    case Kind::Greater: return arg(0) > arg(1);
+    case Kind::And: return condition(r, 0) && condition(r, 1);
+    case Kind::Or: return condition(r, 0) || condition(r, 1);
+    case Kind::Not: return !condition(r, 0);
     case Kind::Random: {
         // Entiers si les deux bornes sont entières, comme dans Scratch
         const double a = arg(0), b = arg(1);
@@ -84,6 +90,12 @@ double Runner::evaluate(const Block *r)
     }
     default: return 0;
     }
+}
+
+bool Runner::condition(const Block *b, int i)
+{
+    const Block *r = b->inputs[i].reporter.get();
+    return r && evaluate(r) != 0;
 }
 
 double Runner::input(const Block *b, int i)
@@ -145,7 +157,16 @@ void Runner::step()
         Frame &f = frames_.last();
         if (!f.next) {
             // Fin de la séquence : tour de boucle suivant, ou retour au niveau au-dessus
-            if (!f.loop || (f.loop->kind != Kind::Forever && --f.remaining <= 0)) {
+            // Fin du corps : tour suivant, ou retour au niveau au-dessus
+            bool again = false;
+            if (f.loop) {
+                switch (f.loop->kind) {
+                case Kind::Forever: again = true; break;
+                case Kind::RepeatUntil: again = !condition(f.loop, 0); break;
+                default: again = --f.remaining > 0; break;
+                }
+            }
+            if (!again) {
                 frames_.removeLast();
                 continue;
             }
@@ -195,6 +216,18 @@ void Runner::step()
         case Kind::Forever:
             frames_.append({b->body.get(), b, 0, waits_});
             break;
+        case Kind::RepeatUntil:
+            if (!condition(b, 0))
+                frames_.append({b->body.get(), b, 0, waits_});
+            break;
+        case Kind::If:
+        case Kind::IfElse: {
+            // Corps choisi : séquence sans boucle, comme un script (dépilée à la fin)
+            const Block *body = condition(b, 0) ? b->body.get() : b->body2.get();
+            if (body && frames_.size() < MaxDepth)
+                frames_.append({body, nullptr, 0, waits_});
+            break;
+        }
         case Kind::Speed:
             send(char('0' + int(input(b, 0, Param::Speed))));
             break;

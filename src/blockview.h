@@ -23,6 +23,7 @@ inline constexpr qreal ReporterH = 30; // hauteur minimale d'un reporter
 inline constexpr qreal ArmW = 16;     // bras gauche d'une boucle
 inline constexpr qreal MinInner = 24; // corps de boucle vide
 inline constexpr qreal BottomH = 24;  // bas d'une boucle
+inline constexpr qreal ElseH = 32;    // ligne « sinon » entre les deux corps
 
 inline const QString MimeType = QStringLiteral("application/x-batmobile-blocks");
 
@@ -34,6 +35,7 @@ struct Item {
     qreal width = 0;
     qreal height = 0;          // le bloc suivant commence à pos.y + height
     qreal rowH = 0;            // hauteur de la ligne de texte (plus haute avec des reporters)
+    qreal elseTop = 0;         // « sinon » : début du second corps, depuis pos.y
     QPainterPath path;
     struct Text {
         QRectF rect;

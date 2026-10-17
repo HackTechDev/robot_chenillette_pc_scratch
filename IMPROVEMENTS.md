@@ -1,8 +1,8 @@
 # Améliorations à faire
 
-Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026.
+Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026 (faits : 21).
 
-Ordre conseillé : **1** (tout en dépend), puis **21**, puis **25** et **26**, et **28** si l'essai réel montre une dérive.
+Ordre conseillé : **1** (tout en dépend), puis **25** et **26**, et **28** si l'essai réel montre une dérive.
 
 ## Priorité
 
@@ -15,10 +15,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 - **Calibrer le robot** avec l'assistant (⚙ Calibrer… sous la scène) : avancer, reculer, pivoter ↺ et ↻, à quelques vitesses (par exemple 2, 4, 6) ; vérifier ensuite avec les exemples Carré et Aller-retour (en cm et degrés) que le robot revient à son point de départ. Contrôler aussi la dérive latérale en ligne droite (chenilles inégales), que le calibrage ne corrige pas (voir 28).
 
 ## Programmation
-
-### 21. Conditions et comparaisons
-
-Blocs « si … alors », « si … alors / sinon », « répéter jusqu'à … », et reporters de comparaison (`<`, `=`, `>`) et logiques (et, ou, non). C'est ce qui manque le plus par rapport à Scratch : aujourd'hui les variables ne servent qu'à compter (ex. « répéter jusqu'à distance > 100 »). Demande des reporters booléens (forme hexagonale dans Scratch) et des entrées qui n'acceptent qu'eux.
 
 ### 22. Paramètres pour Mes blocs
 
@@ -50,7 +46,7 @@ Scène en plein écran et blocs agrandis, pour le vidéoprojecteur.
 
 ### 15. Capteurs
 
-Le Zumo a des capteurs de ligne et un accéléromètre, mais le firmware (`../robot_chenillette`) n'envoie rien au PC aujourd'hui. Il faudrait d'abord le modifier pour remonter des mesures, puis ajouter des blocs comme « si ligne détectée » (voir 21) et lire la liaison dans `Link` (aujourd'hui, une socket lisible signifie une liaison perdue).
+Le Zumo a des capteurs de ligne et un accéléromètre, mais le firmware (`../robot_chenillette`) n'envoie rien au PC aujourd'hui. Il faudrait d'abord le modifier pour remonter des mesures, puis ajouter des conditions comme ⟨ligne détectée⟩ pour les blocs « si » et lire la liaison dans `Link` (aujourd'hui, une socket lisible signifie une liaison perdue).
 
 ### 28. Correction de la dérive
 

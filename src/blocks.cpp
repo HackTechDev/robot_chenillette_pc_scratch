@@ -53,8 +53,17 @@ const Spec Specs[] = {
     {Kind::Random, "random", "nombre aléatoire entre %1 et %2", Operators, Shape::Reporter, Param::Number, 0, 1, 10},
     {Kind::Define, "define", "définir %n", MyBlocks, Shape::Hat, Param::None, 0, 0, 0},
     {Kind::Call, "call", "%n", MyBlocks, Shape::Stack, Param::None, 0, 0, 0},
+    {Kind::If, "if", "si %1 alors", Control, Shape::C, Param::Bool, 0, 0, 0},
+    {Kind::IfElse, "if_else", "si %1 alors", Control, Shape::E, Param::Bool, 0, 0, 0},
+    {Kind::RepeatUntil, "repeat_until", "répéter jusqu'à %1", Control, Shape::C, Param::Bool, 0, 0, 0},
+    {Kind::Less, "less", "%1 < %2", Operators, Shape::Boolean, Param::Number, 0, 0, 50},
+    {Kind::Equal, "equal", "%1 = %2", Operators, Shape::Boolean, Param::Number, 0, 0, 50},
+    {Kind::Greater, "greater", "%1 > %2", Operators, Shape::Boolean, Param::Number, 0, 0, 50},
+    {Kind::And, "and", "%1 et %2", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
+    {Kind::Or, "or", "%1 ou %2", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
+    {Kind::Not, "not", "non %1", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
 };
-static_assert(std::size(Specs) == size_t(Kind::Call) + 1);
+static_assert(std::size(Specs) == size_t(Kind::Not) + 1);
 
 // Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
 struct KeyDef {
@@ -105,6 +114,7 @@ Range range(Param p)
     case Param::Number: return {-9999, 9999, 2};
     case Param::Distance: return {0, 500, 1};
     case Param::Angle: return {0, 3600, 0};
+    case Param::Bool:  // pas de valeur : vide = faux
     case Param::None: break;
     }
     return {0, 0, 0};
@@ -137,9 +147,11 @@ const QList<Category> &categories()
           Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft, Kind::GoRight, Kind::Stop,
           Kind::Speed}},
         {QStringLiteral("Pince et tête"), Tools, {Kind::ClawClose, Kind::ClawOpen, Kind::HeadUp, Kind::HeadDown}},
-        {QStringLiteral("Contrôle"), Control, {Kind::Wait, Kind::Repeat, Kind::Forever}},
+        {QStringLiteral("Contrôle"), Control,
+         {Kind::Wait, Kind::Repeat, Kind::Forever, Kind::If, Kind::IfElse, Kind::RepeatUntil}},
         {QStringLiteral("Opérateurs"), Operators,
-         {Kind::Add, Kind::Subtract, Kind::Multiply, Kind::Divide, Kind::Random}},
+         {Kind::Add, Kind::Subtract, Kind::Multiply, Kind::Divide, Kind::Random, Kind::Less, Kind::Equal,
+          Kind::Greater, Kind::And, Kind::Or, Kind::Not}},
     };
     return list;
 }
@@ -168,6 +180,8 @@ QString formatValue(Param p, double v)
 {
     if (p == Param::Key)
         return keyName(int(clampValue(p, v))) + QStringLiteral(" ▾");  // liste déroulante
+    if (p == Param::Bool)
+        return {};
     QString text = QString::number(clampValue(p, v), 'f', range(p).decimals);
     // Durées : une décimale au moins (« 1,0 »), deux si besoin (« 0,25 ») ; nombres : « 1 », « 0,5 »
     const qsizetype minDecimals = p == Param::Seconds ? 1 : 0;
@@ -203,6 +217,7 @@ QString valuePattern(Param p)
     case Param::Distance: return QStringLiteral("\\d{0,3}([.,]\\d?)?");
     case Param::Angle: return QStringLiteral("\\d{0,4}");
     case Param::Key:  // choisie dans un menu
+    case Param::Bool:
     case Param::None: break;
     }
     return {};
@@ -239,7 +254,8 @@ QJsonObject blockToJson(const Block *b)
     const Spec &s = b->spec();
     QJsonObject o{{QStringLiteral("kind"), QLatin1String(s.id)}};
     for (int i = 0; i < inputCount(s); ++i) {
-        o[InputKeys[i][0]] = b->inputs[i].value;
+        if (s.param != Param::Bool)
+            o[InputKeys[i][0]] = b->inputs[i].value;
         if (b->inputs[i].reporter)
             o[InputKeys[i][1]] = blockToJson(b->inputs[i].reporter.get());
     }
@@ -247,6 +263,8 @@ QJsonObject blockToJson(const Block *b)
         o[QStringLiteral("name")] = b->name;
     if (b->body)
         o[QStringLiteral("body")] = blocksToJson(b->body.get());
+    if (b->body2)
+        o[QStringLiteral("body2")] = blocksToJson(b->body2.get());
     return o;
 }
 
@@ -261,12 +279,14 @@ BlockPtr blockFromJson(const QJsonObject &o)
     for (int i = 0; i < inputCount(*s); ++i) {
         b->inputs[i].value = clampValue(s->param, o[InputKeys[i][0]].toDouble(defs[i]));
         BlockPtr r = blockFromJson(o[InputKeys[i][1]].toObject());
-        if (r && r->spec().shape == Shape::Reporter && acceptsReporter(s->param))
+        if (r && acceptsShape(s->param, r->spec().shape))
             b->inputs[i].reporter = std::move(r);
     }
     b->name = o[QStringLiteral("name")].toString();
     if (hasBody(s->shape))
         b->body = blocksFromJson(o[QStringLiteral("body")].toArray(), false);
+    if (hasElse(s->shape))
+        b->body2 = blocksFromJson(o[QStringLiteral("body2")].toArray(), false);
     return b;
 }
 
@@ -290,10 +310,10 @@ BlockPtr blocksFromJson(const QJsonArray &array, bool top)
             continue;
         const Shape shape = b->spec().shape;
         // Chapeau seulement en tête de script ; un reporter seulement seul, comme script
-        if ((shape == Shape::Hat || shape == Shape::Reporter) && (!top || slot != &first))
+        if ((shape == Shape::Hat || isReporter(shape)) && (!top || slot != &first))
             continue;
         *slot = std::move(b);
-        if (shape == Shape::CapC || shape == Shape::Reporter)  // rien après
+        if (shape == Shape::CapC || isReporter(shape))  // rien après
             break;
         slot = &(*slot)->next;
     }
@@ -309,5 +329,6 @@ void collectVariables(const Block *first, QStringList *names)
         for (const Input &in : b->inputs)
             collectVariables(in.reporter.get(), names);
         collectVariables(b->body.get(), names);
+        collectVariables(b->body2.get(), names);
     }
 }

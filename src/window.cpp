@@ -190,7 +190,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     canvasScroll->setWidgetResizable(true);
     // Robot connecté : un simple clic ne doit pas le faire bouger par erreur
     connect(canvas_, &Canvas::scriptClicked, this, [this](const Block *first) {
-        if (first->spec().shape == Shape::Reporter)
+        if (isReporter(first->spec().shape))
             return showValue(first);
         if (!connected_)
             run(first);
@@ -198,7 +198,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
             status_->setText(QStringLiteral("Robot connecté : double-clic sur un script pour l'exécuter"));
     });
     connect(canvas_, &Canvas::scriptDoubleClicked, this, [this](const Block *first) {
-        if (first->spec().shape == Shape::Reporter)
+        if (isReporter(first->spec().shape))
             return showValue(first);
         run(first);
     });
@@ -714,7 +714,10 @@ void Window::updateMonitors()
 void Window::showValue(const Block *reporter)
 {
     // Clic sur un reporter seul : sa valeur, comme la bulle de Scratch
-    status_->setText(QStringLiteral("Valeur : %1").arg(formatNumber(runner_.evaluate(reporter))));
+    const double v = runner_.evaluate(reporter);
+    const bool boolean = reporter->spec().shape == Shape::Boolean;
+    status_->setText(QStringLiteral("Valeur : %1")
+                         .arg(boolean ? (v != 0 ? QStringLiteral("vrai") : QStringLiteral("faux")) : formatNumber(v)));
 }
 
 void Window::programLoaded()

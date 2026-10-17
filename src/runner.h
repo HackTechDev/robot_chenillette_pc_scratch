@@ -62,6 +62,7 @@ private:
     };
 
     double input(const Block *b, int i);  // valeur d'une entrée (nombre ou reporter)
+    bool condition(const Block *b, int i);  // entrée de condition : vide = faux
     double input(const Block *b, int i, Param p) { return clampValue(p, input(b, i)); }
     void setVariable(const QString &name, double value);
     void send(char cmd);

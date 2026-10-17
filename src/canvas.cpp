@@ -369,12 +369,12 @@ Canvas::Snap Canvas::findSnap(BlockPtr &stack, const QPointF &topLeft) const
             best = {slot, before, at};
         }
     };
-    if (stack->spec().shape == Shape::Reporter) {
-        // Reporter : dans une entrée libre, près de sa pastille
+    if (const Shape shape = stack->spec().shape; isReporter(shape)) {
+        // Reporter : dans une entrée libre de la bonne forme, près de sa pastille
         QList<Item> tmp;
         const qreal h = blockview::layout(stack, QPointF(), tmp);
         for (const Item &it : items_) {
-            if (!acceptsReporter(it.block->spec().param))
+            if (!acceptsShape(it.block->spec().param, shape))
                 continue;
             for (int i = 0; i < 2; ++i) {
                 if (!it.value[i].isNull())
@@ -390,12 +390,14 @@ Canvas::Snap Canvas::findSnap(BlockPtr &stack, const QPointF &topLeft) const
     if (stack->spec().shape != Shape::Hat) {
         for (const Item &it : items_) {
             const Shape s = it.block->spec().shape;
-            if (s == Shape::Reporter)
+            if (isReporter(s))
                 continue;
             if (s != Shape::CapC && !(cap && it.block->next))
                 consider(&it.block->next, nullptr, it.pos + QPointF(0, it.height), topLeft);
             if (hasBody(s) && !(cap && it.block->body))
                 consider(&it.block->body, nullptr, it.pos + QPointF(blockview::ArmW, it.rowH), topLeft);
+            if (hasElse(s) && !(cap && it.block->body2))
+                consider(&it.block->body2, nullptr, it.pos + QPointF(blockview::ArmW, it.elseTop), topLeft);
         }
     }
     if (!cap) {
@@ -403,7 +405,7 @@ Canvas::Snap Canvas::findSnap(BlockPtr &stack, const QPointF &topLeft) const
         const qreal h = blockview::layout(stack, QPointF(), tmp);
         for (const auto &s : scripts_) {
             const Shape top = s->top ? s->top->spec().shape : Shape::Hat;
-            if (top != Shape::Hat && top != Shape::Reporter)
+            if (top != Shape::Hat && !isReporter(top))
                 consider(nullptr, s.get(), s->pos, topLeft + QPointF(0, h));
         }
     }
@@ -573,7 +575,7 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
         return;
     // Clic sur une valeur ou une liste : modification ; ailleurs sur le script : exécution (selon la fenêtre)
     const QPointF m = toModel(e->position());
-    if (const int input = items_[i].valueAt(m); input >= 0)
+    if (const int input = items_[i].valueAt(m); input >= 0 && items_[i].block->spec().param != Param::Bool)
         return editValue(i, input);
     if (!items_[i].var.isNull() && items_[i].var.contains(m))
         return chooseVariable(i);
@@ -585,7 +587,8 @@ void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
 {
     const QPointF m = toModel(e->position());
     const int i = commentAt(m) >= 0 ? -1 : itemAt(m);
-    if (e->button() != Qt::LeftButton || i < 0 || running_ || items_[i].valueAt(m) >= 0
+    if (e->button() != Qt::LeftButton || i < 0 || running_
+        || (items_[i].valueAt(m) >= 0 && items_[i].block->spec().param != Param::Bool)
         || (!items_[i].var.isNull() && items_[i].var.contains(m)))
         return mousePressEvent(e);
     pressItem_ = -1;  // le relâchement qui suit n'est pas un second clic
@@ -862,7 +865,7 @@ void Canvas::wheelEvent(QWheelEvent *e)
     }
     const QPointF m = toModel(e->position());
     const int i = itemAt(m);
-    const int input = i >= 0 ? items_[i].valueAt(m) : -1;
+    const int input = i >= 0 && items_[i].block->spec().param != Param::Bool ? items_[i].valueAt(m) : -1;
     if (input < 0) {
         wheelAccum_ = 0;
         return e->ignore();  // la vue défile

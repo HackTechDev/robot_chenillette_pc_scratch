@@ -17,10 +17,12 @@ enum class Shape {
     C,         // boucle avec corps
     CapC,      // boucle sans fin : rien en dessous
     Reporter,  // valeur (arrondi) : se place dans une entrée d'un autre bloc
+    Boolean,   // vrai / faux (hexagone) : se place dans une entrée de condition
+    E,         // si … alors / sinon : deux corps
 };
 
-// Type des entrées numériques d'un bloc (toutes ses entrées ont le même)
-enum class Param { None, Seconds, Count, Speed, Key, Number, Distance, Angle };
+// Type des entrées d'un bloc (toutes ses entrées ont le même) ; Bool = condition
+enum class Param { None, Seconds, Count, Speed, Key, Number, Distance, Angle, Bool };
 
 // L'ordre doit suivre la table Specs de blocks.cpp
 enum class Kind {
@@ -34,6 +36,8 @@ enum class Kind {
     SetVar, ChangeVar, Variable,
     Add, Subtract, Multiply, Divide, Random,
     Define, Call,  // mes blocs : « définir nom » (chapeau) et l'appel « nom »
+    If, IfElse, RepeatUntil,
+    Less, Equal, Greater, And, Or, Not,
 };
 
 struct Spec {
@@ -50,10 +54,17 @@ struct Spec {
 };
 
 const Spec &specOf(Kind kind);
-inline bool hasBody(Shape s) { return s == Shape::C || s == Shape::CapC; }
+inline bool hasBody(Shape s) { return s == Shape::C || s == Shape::CapC || s == Shape::E; }
+inline bool hasElse(Shape s) { return s == Shape::E; }
+inline bool isReporter(Shape s) { return s == Shape::Reporter || s == Shape::Boolean; }
 int inputCount(const Spec &s);
-// Une entrée de ce type peut recevoir un reporter (pas la touche)
-inline bool acceptsReporter(Param p) { return p != Param::None && p != Param::Key; }
+// Une entrée de ce type accepte ce reporter : nombre ← arrondi, condition ← hexagone (pas la touche)
+inline bool acceptsShape(Param p, Shape s)
+{
+    if (p == Param::Bool)
+        return s == Shape::Boolean;
+    return s == Shape::Reporter && p != Param::None && p != Param::Key;
+}
 
 struct Category {
     QString name;
@@ -83,6 +94,7 @@ struct Block {
     QString name;  // variable, ou bloc personnalisé
     BlockPtr next;
     BlockPtr body;
+    BlockPtr body2;  // « sinon »
 };
 
 Block *lastBlock(Block *b);

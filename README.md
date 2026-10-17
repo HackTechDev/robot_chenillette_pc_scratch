@@ -91,6 +91,9 @@ Quelques vitesses suffisent (par exemple 2, 4 et 6) : les autres sont interpolé
 | attendre N s | rien |
 | répéter N fois { … } | boucle |
 | répéter indéfiniment { … } | boucle sans fin (jusqu'à ■) ; aucun bloc ne peut la suivre |
+| si ⟨condition⟩ alors { … } / si ⟨condition⟩ alors { … } sinon { … } | exécute un corps selon la condition |
+| répéter jusqu'à ⟨condition⟩ { … } | répète le corps tant que la condition est fausse (vérifiée avant chaque tour) |
+| ⟨a < b⟩, ⟨a = b⟩, ⟨a > b⟩, ⟨… et …⟩, ⟨… ou …⟩, ⟨non …⟩ | **conditions** (blocs hexagonaux, vrai / faux) |
 | mettre [var ▾] à N / ajouter N à [var ▾] | change une variable |
 | définir [nom] / [nom] | **mes blocs** : définition d'un bloc personnalisé, et son appel |
 | (var), (a + b), (a − b), (a × b), (a ÷ b), (nombre aléatoire entre a et b) | **reporters** (blocs arrondis) : une valeur, à glisser dans n'importe quelle entrée numérique |
@@ -98,6 +101,8 @@ Quelques vitesses suffisent (par exemple 2, 4 et 6) : les autres sont interpolé
 Chaque exécution commence par remettre la vitesse par défaut (`4` → 200), sauf celle d'un script de touche.
 
 **Variables et opérateurs** : **Créer une variable** (section Variables de la palette) ajoute un reporter à son nom, et les blocs « mettre … à » / « ajouter … à ». Les reporters (variables et opérateurs verts) se glissent dans une entrée — durée, nombre de tours, vitesse, ou entrée d'un autre opérateur — pour calculer une valeur pendant l'exécution, par exemple une spirale : « répéter 10 fois : ajouter 0,1 à durée, avancer pendant (durée) s, pivoter ↻ 0,5 s ». Le nom de variable se choisit dans la liste ▾ du bloc. Les valeurs calculées sont bornées à l'usage (durée 0–60 s, vitesse 0–9…) ; une division par zéro donne 0 ; un nombre aléatoire entre deux entiers est entier. Les variables gardent leur valeur d'une exécution à l'autre (comme dans Scratch) et s'affichent en haut à gauche de la scène. Un clic sur un reporter seul affiche sa valeur. Clic droit sur une variable de la palette : la supprimer (si aucun bloc ne l'utilise).
+
+**Conditions** : les blocs hexagonaux (vert, catégorie Opérateurs) donnent vrai ou faux et ne se placent que dans une case de condition (hexagone en creux) : celle de « si », « répéter jusqu'à », « et », « ou », « non ». Les comparaisons acceptent des nombres ou des reporters, par exemple ⟨(distance) > 100⟩. Une case de condition vide vaut faux. Un clic sur une condition seule affiche « vrai » ou « faux ».
 
 **Mes blocs** : **Créer un bloc** (section Mes blocs de la palette) demande un nom, par exemple « faire un carré », et pose un chapeau rose **définir faire un carré** sous les scripts ; on empile dessous ce que fait le bloc. La palette propose alors le bloc **faire un carré**, à utiliser dans n'importe quel script, y compris dans sa propre définition. Un clic sur le script « définir … » l'exécute pour l'essayer. Si deux définitions portent le même nom, la plus haute est utilisée ; supprimer le chapeau « définir » retire le bloc de la palette (les appels restants ne font rien). Un bloc qui s'appelle lui-même sans fin (plus de 1000 appels imbriqués) arrête le programme avec un message. Les blocs personnalisés n'ont pas de paramètres : utiliser une variable à la place. En pas à pas, l'arrêt se fait sur les blocs de la définition, pas sur l'appel.
 
