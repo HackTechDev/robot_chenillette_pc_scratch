@@ -32,6 +32,10 @@ protected:
 private:
     void advance();  // applique le mouvement en cours depuis le dernier appel
     void move(qreal distance);
+    void tick();
+    bool clawMoving() const { return motion_ == 'c' || motion_ == 'v'; }
+    qreal clawZoomOpacity() const;  // loupe sur la pince : 0 = cachée
+    void paintClawZoom(QPainter &p, qreal opacity) const;
 
     QPointF pos_;
     qreal heading_ = 0;  // degrés, 0 = vers le haut, sens horaire
@@ -43,4 +47,7 @@ private:
     QList<QPair<QString, double>> monitors_;
     QTimer timer_;
     QElapsedTimer clock_;
+    bool clawZoom_ = false;     // loupe affichée (pendant et juste après un mouvement de pince)
+    char clawDirection_ = 0;    // dernier mouvement de pince : 'c' ou 'v'
+    QElapsedTimer clawSince_;   // fin du mouvement de pince
 };

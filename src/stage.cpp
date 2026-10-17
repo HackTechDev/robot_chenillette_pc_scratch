@@ -21,18 +21,39 @@ constexpr qreal DegreesPerSpeed = 0.9;
 constexpr qreal ClawTravelS = 1.0;  // pince : fermée → ouverte
 constexpr qreal HeadTravelS = 1.0;  // tête : basse → haute
 constexpr int FrameMs = 16;
+constexpr int ClawZoomHoldMs = 1000;  // loupe sur la pince gardée après le mouvement…
+constexpr int ClawZoomFadeMs = 400;   // … puis effacée en fondu
 
 constexpr qreal Pi = 3.14159265358979323846;
+
+const QColor ClawColor(0x99, 0x66, 0xFF);
+
+// Mâchoires de la pince, pivots en (±spread, 0), pointées vers le haut (avant du robot) ;
+// chaque mâchoire se termine par un crochet tourné vers l'intérieur
+void drawJaws(QPainter &p, qreal claw, qreal spread, qreal length, qreal width)
+{
+    const qreal open = 5 + claw * 35;  // degrés
+    p.setPen(QPen(ClawColor, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p.setBrush(Qt::NoBrush);
+    for (int side : {-1, 1}) {
+        p.save();
+        p.translate(side * spread, 0);
+        p.rotate(side * open);
+        QPainterPath jaw;
+        jaw.moveTo(0, 0);
+        jaw.lineTo(0, -length);
+        jaw.lineTo(-side * length * 0.35, -length * 1.2);
+        p.drawPath(jaw);
+        p.restore();
+    }
+}
 
 }  // namespace
 
 Stage::Stage(QWidget *parent) : QWidget(parent)
 {
     timer_.setInterval(FrameMs);
-    connect(&timer_, &QTimer::timeout, this, [this] {
-        advance();
-        update();
-    });
+    connect(&timer_, &QTimer::timeout, this, &Stage::tick);
     reset();
 }
 
@@ -68,14 +89,81 @@ void Stage::command(char cmd)
         speedLevel_ = cmd - '0';  // ne change pas le mouvement en cours, comme le firmware
         return;
     }
+    if (clawMoving() && cmd != motion_)
+        clawSince_.start();  // fin du mouvement de pince : la loupe reste un moment
     motion_ = cmd;
+    if (clawMoving()) {
+        clawZoom_ = true;
+        clawDirection_ = motion_;
+    }
     if (motion_ == Stop) {
-        timer_.stop();
+        if (!clawZoom_)
+            timer_.stop();  // sinon le minuteur continue pour effacer la loupe
     } else if (!timer_.isActive()) {
         clock_.start();
         timer_.start();
     }
     update();
+}
+
+void Stage::tick()
+{
+    advance();
+    if (clawZoom_ && clawZoomOpacity() <= 0)
+        clawZoom_ = false;
+    if (motion_ == Stop && !clawZoom_)
+        timer_.stop();
+    update();
+}
+
+qreal Stage::clawZoomOpacity() const
+{
+    if (!clawZoom_)
+        return 0;
+    if (clawMoving() || !clawSince_.isValid())
+        return 1;
+    const qint64 t = clawSince_.elapsed() - ClawZoomHoldMs;
+    return t <= 0 ? 1 : qMax(0.0, 1 - qreal(t) / ClawZoomFadeMs);
+}
+
+void Stage::paintClawZoom(QPainter &p, qreal opacity) const
+{
+    // Loupe en bas à gauche : la pince vue de près
+    const QRectF box(8, StageH - 108, 136, 100);
+    p.save();
+    p.setOpacity(opacity);
+    p.setPen(QPen(QColor(0xC8, 0xC8, 0xC8), 1));
+    p.setBrush(Qt::white);
+    p.drawRoundedRect(box, 8, 8);
+
+    p.save();
+    p.translate(box.center().x(), box.top() + 74);
+    // Support de la pince (avant du châssis)
+    p.setPen(QPen(QColor(0xFF, 0xD7, 0x00), 2));
+    p.setBrush(QColor(0x2A, 0x2A, 0x2A));
+    p.drawRoundedRect(QRectF(-34, 0, 68, 14), 4, 4);
+    drawJaws(p, claw_, 14, 30, 7);
+    // Pivots
+    p.setPen(Qt::NoPen);
+    p.setBrush(ClawColor.darker(140));
+    p.drawEllipse(QPointF(-14, 0), 4, 4);
+    p.drawEllipse(QPointF(14, 0), 4, 4);
+    p.restore();
+
+    QFont f = font();
+    f.setPixelSize(12);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(QColor(0x57, 0x5E, 0x75));
+    QString text;
+    if (clawMoving())
+        text = clawDirection_ == 'c' ? QStringLiteral("s'ouvre…") : QStringLiteral("se ferme…");
+    else
+        text = claw_ >= 0.99 ? QStringLiteral("ouverte") : claw_ <= 0.01 ? QStringLiteral("fermée")
+                                                         : QStringLiteral("ouverte à %1 %").arg(qRound(claw_ * 100));
+    p.drawText(QRectF(box.left(), box.top() + 4, box.width(), 18), Qt::AlignCenter,
+               QStringLiteral("pince : %1").arg(text));
+    p.restore();
 }
 
 void Stage::advance()
@@ -146,15 +234,10 @@ void Stage::paintEvent(QPaintEvent *)
     p.drawRoundedRect(QRectF(-15, -18, 30, 38), 5, 5);  // châssis
 
     // Pince : deux mâchoires à l'avant, écartées selon l'ouverture
-    p.setPen(QPen(QColor(0x99, 0x66, 0xFF), 4, Qt::SolidLine, Qt::RoundCap));
-    const qreal open = 8 + claw_ * 30;  // degrés
-    for (int side : {-1, 1}) {
-        p.save();
-        p.translate(side * 7, -18);
-        p.rotate(side * open);
-        p.drawLine(QPointF(0, 0), QPointF(0, -14));
-        p.restore();
-    }
+    p.save();
+    p.translate(0, -18);
+    drawJaws(p, claw_, 6, 13, 3.5);
+    p.restore();
 
     // Tête : l'œil avance quand elle se lève
     p.setPen(Qt::NoPen);
@@ -188,6 +271,9 @@ void Stage::paintEvent(QPaintEvent *)
         p.drawText(pill, Qt::AlignCenter, v);
         my += 26;
     }
+
+    if (const qreal opacity = clawZoomOpacity(); opacity > 0)
+        paintClawZoom(p, opacity);
 
     // Jauge de la tête
     const QRectF gauge(StageW - 18, StageH - 70, 8, 56);
