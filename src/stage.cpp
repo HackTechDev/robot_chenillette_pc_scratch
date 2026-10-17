@@ -15,12 +15,16 @@ namespace {
 constexpr qreal StageW = 480;
 constexpr qreal StageH = 360;
 constexpr qreal UnitsPerCm = 3;
-constexpr qreal FieldW = StageW / UnitsPerCm;
-constexpr qreal FieldH = StageH / UnitsPerCm;
+// Terrain de 4,80 × 3,60 m ; la vue à 100 % en montre 160 × 120 cm, dézoomée tout le terrain
+constexpr qreal FieldW = 480;
+constexpr qreal FieldH = 360;
+constexpr QPointF FieldCenter(FieldW * UnitsPerCm / 2, FieldH * UnitsPerCm / 2);  // en unités de dessin
 constexpr qreal GridCm = 10;
 constexpr qreal RobotRadius = 7;     // cm : garde le robot entier sur le terrain
 constexpr qreal RobotDrawScale = 0.25;  // dessin du robot (±24) → ~12 cm de large
+constexpr qreal MinViewZoom = StageW / (FieldW * UnitsPerCm);  // tout le terrain
 constexpr qreal MaxViewZoom = 6;
+constexpr qreal FollowMargin = 0.15;  // le robot reste à 15 % du bord de la vue
 constexpr qreal ViewZoomStep = 1.25;
 constexpr qreal ClawTravelS = 1.0;  // pince : fermée → ouverte
 constexpr qreal HeadTravelS = 1.0;  // tête : basse → haute
@@ -56,7 +60,7 @@ void drawJaws(QPainter &p, qreal claw, qreal spread, qreal length, qreal width)
 
 Stage::Stage(QWidget *parent) : QWidget(parent)
 {
-    viewCenter_ = QPointF(StageW / 2, StageH / 2);
+    viewCenter_ = FieldCenter;
     timer_.setInterval(FrameMs);
     connect(&timer_, &QTimer::timeout, this, &Stage::tick);
     reset();
@@ -78,7 +82,7 @@ void Stage::reset()
     pos_ = QPointF(FieldW / 2, FieldH / 2);
     heading_ = 0;
     trail_ = {pos_};
-    update();
+    setView(viewZoom_, pos_ * UnitsPerCm);  // vue recentrée sur le robot
 }
 
 // --- Vue zoomable ---
@@ -104,11 +108,39 @@ QTransform Stage::viewTransform() const
 
 void Stage::setView(qreal zoom, QPointF center)
 {
-    viewZoom_ = qBound(1.0, zoom, MaxViewZoom);
+    viewZoom_ = qBound(MinViewZoom, zoom, MaxViewZoom);
     const qreal hw = StageW / (2 * viewZoom_), hh = StageH / (2 * viewZoom_);
-    viewCenter_ = QPointF(qBound(hw, center.x(), StageW - hw), qBound(hh, center.y(), StageH - hh));
-    setCursor(viewZoom_ > 1 ? Qt::OpenHandCursor : Qt::ArrowCursor);
+    viewCenter_ = QPointF(qBound(hw, center.x(), FieldW * UnitsPerCm - hw), qBound(hh, center.y(), FieldH * UnitsPerCm - hh));
+    setCursor(canPan() ? Qt::OpenHandCursor : Qt::ArrowCursor);
     update();
+}
+
+bool Stage::canPan() const
+{
+    return viewZoom_ > MinViewZoom + 1e-6;  // une partie du terrain est hors de la vue
+}
+
+void Stage::followRobot()
+{
+    // Le robot sort de la vue : elle se décale juste assez pour le garder visible
+    if (dragging_)
+        return;
+    const qreal hw = StageW / (2 * viewZoom_), hh = StageH / (2 * viewZoom_);
+    const QPointF r = pos_ * UnitsPerCm;
+    const QRectF inner(viewCenter_.x() - hw * (1 - FollowMargin), viewCenter_.y() - hh * (1 - FollowMargin),
+                       2 * hw * (1 - FollowMargin), 2 * hh * (1 - FollowMargin));
+    if (inner.contains(r))
+        return;
+    QPointF shift;
+    if (r.x() < inner.left())
+        shift.rx() = r.x() - inner.left();
+    else if (r.x() > inner.right())
+        shift.rx() = r.x() - inner.right();
+    if (r.y() < inner.top())
+        shift.ry() = r.y() - inner.top();
+    else if (r.y() > inner.bottom())
+        shift.ry() = r.y() - inner.bottom();
+    setView(viewZoom_, viewCenter_ + shift);
 }
 
 void Stage::wheelEvent(QWheelEvent *e)
@@ -119,14 +151,14 @@ void Stage::wheelEvent(QWheelEvent *e)
     // Le point du dessin sous la souris reste sous la souris
     const QPointF p = fitTransform().inverted().map(e->position());
     const QPointF world = viewTransform().inverted().map(p);
-    const qreal zoom = qBound(1.0, viewZoom_ * std::pow(ViewZoomStep, delta / 120.0), MaxViewZoom);
+    const qreal zoom = qBound(MinViewZoom, viewZoom_ * std::pow(ViewZoomStep, delta / 120.0), MaxViewZoom);
     setView(zoom, world - (p - QPointF(StageW / 2, StageH / 2)) / zoom);
     e->accept();
 }
 
 void Stage::mousePressEvent(QMouseEvent *e)
 {
-    if (e->button() != Qt::LeftButton || viewZoom_ <= 1)
+    if (e->button() != Qt::LeftButton || !canPan())
         return QWidget::mousePressEvent(e);
     dragging_ = true;
     dragLast_ = e->position();
@@ -148,13 +180,13 @@ void Stage::mouseReleaseEvent(QMouseEvent *e)
     if (!dragging_)
         return QWidget::mouseReleaseEvent(e);
     dragging_ = false;
-    setCursor(viewZoom_ > 1 ? Qt::OpenHandCursor : Qt::ArrowCursor);
+    setCursor(canPan() ? Qt::OpenHandCursor : Qt::ArrowCursor);
 }
 
 void Stage::mouseDoubleClickEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton)
-        setView(1, QPointF(StageW / 2, StageH / 2));
+        setView(1, pos_ * UnitsPerCm);  // 100 %, centré sur le robot
 }
 
 void Stage::setSpeech(const QString &text)
@@ -198,6 +230,7 @@ void Stage::command(char cmd)
 void Stage::tick()
 {
     advance();
+    followRobot();
     if (clawZoom_ && clawZoomOpacity() <= 0)
         clawZoom_ = false;
     if (motion_ == Stop && !clawZoom_)
@@ -336,6 +369,11 @@ void Stage::paintEvent(QPaintEvent *)
         p.drawLine(QPointF(x, 0), QPointF(x, FieldH));
     for (qreal y = GridCm; y < FieldH; y += GridCm)
         p.drawLine(QPointF(0, y), QPointF(FieldW, y));
+    QPen border(QColor(0x99, 0x99, 0x99), 2);  // bord du terrain
+    border.setCosmetic(true);
+    p.setPen(border);
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(QRectF(0, 0, FieldW, FieldH));
 
     // Trace du parcours
     p.setPen(QPen(QColor(0x4C, 0x97, 0xFF), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -369,7 +407,7 @@ void Stage::paintEvent(QPaintEvent *)
     p.restore();
     p.restore();  // fin du terrain en cm
 
-    if (viewZoom_ > 1) {
+    if (qAbs(viewZoom_ - 1) > 0.01) {
         QFont zf = font();
         zf.setPixelSize(11);
         p.setFont(zf);

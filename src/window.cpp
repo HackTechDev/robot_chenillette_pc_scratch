@@ -267,7 +267,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     stageCol->addWidget(stagePlaceholder_);
     stageCol->addLayout(stageButtons);
     QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. Terrain de "
-                                             "160 × 120 cm ; distances et angles d'après le calibrage."),
+                                             "4,80 × 3,60 m (molette : zoom) ; distances et angles d'après le calibrage."),
                               QStringLiteral("hint"));
     stageHint->setWordWrap(true);
     stageHint->setFixedWidth(360);

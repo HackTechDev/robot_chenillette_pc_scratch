@@ -9,7 +9,8 @@
 #include <QTimer>
 #include <QWidget>
 
-// Scène : le robot vu de dessus sur un terrain de 160 × 120 cm (carreaux de 10 cm), animé
+// Scène : le robot vu de dessus sur un terrain de 4,80 × 3,60 m (carreaux de 10 cm ; la vue à
+// 100 % en montre 160 × 120 cm et suit le robot), animé
 // d'après les commandes du programme (avec ou sans robot connecté). Vitesses du calibrage,
 // rampe d'accélération en ligne droite comme le firmware.
 class Stage : public QWidget
@@ -42,7 +43,9 @@ protected:
 private:
     QTransform fitTransform() const;   // unités de dessin (480 × 360) → widget
     QTransform viewTransform() const;  // zoom de la vue, en unités de dessin
-    void setView(qreal zoom, QPointF center);  // bornée : le terrain remplit toujours la vue
+    void setView(qreal zoom, QPointF center);  // bornée : la vue reste sur le terrain
+    bool canPan() const;
+    void followRobot();
     void advance();  // applique le mouvement en cours depuis le dernier appel
     void move(qreal distance);  // cm
     void drive(qreal dt);       // ligne droite, avec rampe

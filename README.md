@@ -37,7 +37,7 @@ Dans la zone de programme :
 - clic droit sur le fond : **Ajouter un commentaire**, **Coller**, **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (scripts et commentaires ; annulables avec ↶) ;
 - **commentaires** (notes jaunes) : clic droit sur le fond → **Ajouter un commentaire** (note libre), ou sur un bloc → **Ajouter un commentaire** (note **attachée** à ce bloc, à sa droite, reliée par un trait : elle suit son script quand on le déplace et disparaît avec le bloc s'il est supprimé) ; clic sur la note pour écrire, clic ailleurs pour valider ; glisser la note pour la déplacer (une note attachée garde sa place par rapport au bloc), son coin bas-droit pour la redimensionner ; clic droit → **Détacher du bloc** ou **Supprimer le commentaire**. Les notes sont enregistrées avec le programme (attaches comprises) et s'annulent avec ↶ ; copier / coller et Dupliquer ne copient pas les notes ;
 - glisser le fond (ou bouton du milieu) : déplacer la vue ;
-- **zoom** de 50 à 200 % : **molette** (autour de la souris ; sur un nombre, la molette change le nombre, Ctrl+molette zoome quand même), boutons **− / 100 % / +** en bas, Ctrl++ / Ctrl+− / Ctrl+0 ; **Maj+molette** fait défiler la vue.
+- **zoom** de 25 à 200 % : **molette** (autour de la souris ; sur un nombre, la molette change le nombre, Ctrl+molette zoome quand même), boutons **− / 100 % / +** en bas, Ctrl++ / Ctrl+− / Ctrl+0 ; **Maj+molette** fait défiler la vue.
 
 Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne peuvent pas être déplacés.
 
@@ -65,11 +65,11 @@ Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibr�
 
 À droite, le robot vu de dessus suit les commandes du programme, robot connecté ou non : déplacements avec la trace du parcours, ouverture de la pince, jauge de la hauteur de la tête. Pendant un bloc « ouvrir / fermer la pince », une **loupe** en bas à gauche montre la pince en grand qui s'ouvre ou se ferme (« s'ouvre… », « se ferme… », puis « ouverte », « fermée » ou « ouverte à N % ») ; elle s'efface une seconde après. **⟲ Replacer** le remet au centre et efface la trace. Il bute sur les bords de la scène.
 
-**Zoom de la scène** : la **molette** zoome autour de la souris (jusqu'à ×6), **glisser** déplace la vue zoomée, **double-clic** revient à 100 % ; le terrain reste toujours visible en entier dans la vue. Les variables, la jauge de la tête et la loupe de la pince gardent leur taille. Fonctionne aussi dans la fenêtre séparée.
+**Zoom de la scène** : la **molette** zoome autour de la souris, de ×0,33 (tout le terrain) à ×6 ; **glisser** déplace la vue, **double-clic** revient à 100 % centré sur le robot. La vue suit le robot quand il approche de son bord, pour ne pas le perdre ; **⟲ Replacer** la recentre aussi. Les variables, la jauge de la tête et la loupe de la pince gardent leur taille. Fonctionne aussi dans la fenêtre séparée.
 
 **⧉ Fenêtre** place la scène dans une fenêtre séparée, redimensionnable (par exemple sur un second écran ou le vidéoprojecteur) ; **F11** l'y met en plein écran. Dans cette fenêtre, **Échap** arrête le programme (et quitte le plein écran), **F5** / **F10** lancent ou avancent pas à pas, et les touches des scripts « quand la touche … » fonctionnent. Fermer la fenêtre (ou **⧉ Rattacher**) remet la scène à sa place ; l'appli se souvient de ce choix et de la position de la fenêtre au lancement suivant.
 
-Le terrain mesure **160 × 120 cm** (carreaux de 10 cm) et le robot y est dessiné à l'échelle (~12 cm). La scène utilise le **calibrage** : vitesse en cm/s, démarrage progressif en ligne droite (comme le firmware, qui accélère sur ~0,4 s à la vitesse 200), pivots en °/s. Sans calibrage, valeurs par défaut : 20 cm/s et 180°/s à la vitesse 4.
+Le terrain mesure **4,80 × 3,60 m** (carreaux de 10 cm, bord gris) ; à 100 %, la vue en montre 160 × 120 cm autour du robot. Le robot y est dessiné à l'échelle (~12 cm) et bute sur les bords du terrain. La scène utilise le **calibrage** : vitesse en cm/s, démarrage progressif en ligne droite (comme le firmware, qui accélère sur ~0,4 s à la vitesse 200), pivots en °/s. Sans calibrage, valeurs par défaut : 20 cm/s et 180°/s à la vitesse 4.
 
 ## Calibrage
 
