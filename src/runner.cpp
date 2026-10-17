@@ -67,6 +67,7 @@ double Runner::evaluate(const Block *r)
     auto arg = [&](int i) { return input(r, i); };
     switch (r->kind) {
     case Kind::Variable: return vars_.value(r->name);
+    case Kind::ParamValue: return argument(r->name);
     case Kind::Add: return arg(0) + arg(1);
     case Kind::Subtract: return arg(0) - arg(1);
     case Kind::Multiply: return arg(0) * arg(1);
@@ -90,6 +91,16 @@ double Runner::evaluate(const Block *r)
     }
     default: return 0;
     }
+}
+
+double Runner::argument(const QString &name) const
+{
+    // Appel le plus proche : les boucles et « si » de la définition sont au-dessus de lui
+    for (qsizetype i = frames_.size() - 1; i >= 0; --i) {
+        if (frames_[i].call)
+            return frames_[i].args.value(name);
+    }
+    return 0;  // hors d'un appel (clic sur le reporter seul)
 }
 
 bool Runner::condition(const Block *b, int i)
@@ -206,7 +217,11 @@ void Runner::step()
                     emit error(QStringLiteral("Programme arrêté : le bloc « %1 » s'appelle sans fin.").arg(b->name));
                     return;
                 }
-                frames_.append({def->next.get(), nullptr, 0, waits_});  // f n'est plus valide
+                // Valeurs calculées dans le contexte de l'appelant, avant d'entrer dans la définition
+                QHash<QString, double> args;
+                for (int i = 0; i < inputCount(b); ++i)
+                    args[b->params[i]] = input(b, i);
+                frames_.append({def->next.get(), nullptr, 0, waits_, args, true});  // f n'est plus valide
             }
             break;
         case Kind::Repeat:

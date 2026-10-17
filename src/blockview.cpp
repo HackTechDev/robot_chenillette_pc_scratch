@@ -174,8 +174,22 @@ qreal minWidth(Shape s)
 }
 
 // Morceaux du texte d'un bloc : texte, ou %1 / %2 / %v / %n
-QStringList tokens(const Spec &s)
+QStringList tokens(const Block *b)
 {
+    // Mes blocs : « nom (entrées) » pour l'appel, « définir nom (paramètres) » pour la définition
+    if (b->kind == Kind::Call) {
+        QStringList out{QStringLiteral("%n")};
+        for (int i = 0; i < inputCount(b); ++i)
+            out.append(i == 0 ? QStringLiteral("%1") : QStringLiteral("%2"));
+        return out;
+    }
+    if (b->kind == Kind::Define) {
+        QStringList out{QStringLiteral("définir"), QStringLiteral("%n")};
+        for (const QString &p : b->params)
+            out.append(QStringLiteral("(%1)").arg(p));
+        return out;
+    }
+    const Spec &s = b->spec();
     static const QRegularExpression re(QStringLiteral("(%[12vn])"));
     QStringList out;
     const QString text = QString::fromUtf8(s.text);
@@ -223,7 +237,7 @@ qreal placeTokens(const Block *b, const QFontMetricsF &fm, qreal left, qreal row
     const qreal pad = s.shape == Shape::Boolean ? qMax(10.0, rowH / 2) : s.shape == Shape::Reporter ? 8 : Pad;
     qreal x = left + pad;
     bool first = true;
-    for (const QString &t : tokens(s)) {
+    for (const QString &t : tokens(b)) {
         if (!first)
             x += Gap;
         first = false;

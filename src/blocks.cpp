@@ -52,7 +52,7 @@ const Spec Specs[] = {
     {Kind::Divide, "divide", "%1 ÷ %2", Operators, Shape::Reporter, Param::Number, 0, 1, 1},
     {Kind::Random, "random", "nombre aléatoire entre %1 et %2", Operators, Shape::Reporter, Param::Number, 0, 1, 10},
     {Kind::Define, "define", "définir %n", MyBlocks, Shape::Hat, Param::None, 0, 0, 0},
-    {Kind::Call, "call", "%n", MyBlocks, Shape::Stack, Param::None, 0, 0, 0},
+    {Kind::Call, "call", "%n", MyBlocks, Shape::Stack, Param::Number, 0, 0, 0},  // entrées : inputCount(Block*)
     {Kind::If, "if", "si %1 alors", Control, Shape::C, Param::Bool, 0, 0, 0},
     {Kind::IfElse, "if_else", "si %1 alors", Control, Shape::E, Param::Bool, 0, 0, 0},
     {Kind::RepeatUntil, "repeat_until", "répéter jusqu'à %1", Control, Shape::C, Param::Bool, 0, 0, 0},
@@ -62,8 +62,9 @@ const Spec Specs[] = {
     {Kind::And, "and", "%1 et %2", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
     {Kind::Or, "or", "%1 ou %2", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
     {Kind::Not, "not", "non %1", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
+    {Kind::ParamValue, "param", "%n", MyBlocks, Shape::Reporter, Param::None, 0, 0, 0},
 };
-static_assert(std::size(Specs) == size_t(Kind::Not) + 1);
+static_assert(std::size(Specs) == size_t(Kind::ParamValue) + 1);
 
 // Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
 struct KeyDef {
@@ -162,6 +163,13 @@ Block::Block(Kind k) : kind(k)
     inputs[1].value = specOf(k).def2;
 }
 
+int inputCount(const Block *b)
+{
+    if (b->kind == Kind::Call)
+        return qMin(int(b->params.size()), MaxParams);
+    return inputCount(b->spec());
+}
+
 Block *lastBlock(Block *b)
 {
     while (b && b->next)
@@ -253,7 +261,9 @@ QJsonObject blockToJson(const Block *b)
 {
     const Spec &s = b->spec();
     QJsonObject o{{QStringLiteral("kind"), QLatin1String(s.id)}};
-    for (int i = 0; i < inputCount(s); ++i) {
+    if (!b->params.isEmpty())
+        o[QStringLiteral("params")] = QJsonArray::fromStringList(b->params);
+    for (int i = 0; i < inputCount(b); ++i) {
         if (s.param != Param::Bool)
             o[InputKeys[i][0]] = b->inputs[i].value;
         if (b->inputs[i].reporter)
@@ -275,8 +285,12 @@ BlockPtr blockFromJson(const QJsonObject &o)
     if (!s)
         return nullptr;
     auto b = std::make_unique<Block>(s->kind);
+    for (const QJsonValue &p : o[QStringLiteral("params")].toArray()) {
+        if (b->params.size() < MaxParams && !p.toString().isEmpty())
+            b->params.append(p.toString());
+    }
     const double defs[2] = {s->def, s->def2};
-    for (int i = 0; i < inputCount(*s); ++i) {
+    for (int i = 0; i < inputCount(b.get()); ++i) {
         b->inputs[i].value = clampValue(s->param, o[InputKeys[i][0]].toDouble(defs[i]));
         BlockPtr r = blockFromJson(o[InputKeys[i][1]].toObject());
         if (r && acceptsShape(s->param, r->spec().shape))

@@ -201,14 +201,14 @@ void Canvas::updateProcedures()
             order.push_back(s.get());
     }
     std::stable_sort(order.begin(), order.end(), [](const Script *a, const Script *b) { return a->pos.y() < b->pos.y(); });
-    QStringList names;
+    QList<Procedure> list;
     for (const Script *s : order) {
-        if (!names.contains(s->top->name))
-            names.append(s->top->name);
+        if (std::none_of(list.cbegin(), list.cend(), [s](const Procedure &p) { return p.name == s->top->name; }))
+            list.append({s->top->name, s->top->params});
     }
-    if (names == procedures_)
+    if (list == procedures_)
         return;
-    procedures_ = names;
+    procedures_ = list;
     emit proceduresChanged(procedures_);
 }
 
@@ -217,7 +217,7 @@ const Block *Canvas::procedure(const QString &name) const
     return topScript([&name](const Block *top) { return top->kind == Kind::Define && top->name == name; });
 }
 
-bool Canvas::addProcedure(const QString &name)
+bool Canvas::addProcedure(const QString &name, const QStringList &params)
 {
     if (name.isEmpty() || procedure(name))
         return false;
@@ -226,6 +226,7 @@ bool Canvas::addProcedure(const QString &name)
     const QRectF r = blockview::bounds(items_);
     auto define = std::make_unique<Block>(Kind::Define);
     define->name = name;
+    define->params = params.mid(0, MaxParams);
     const QPointF pos(FirstScript.x(), items_.isEmpty() ? FirstScript.y() : r.bottom() + 2 * ArrangeGap);
     addScript(pos, std::move(define));
     relayout();

@@ -58,6 +58,7 @@ private:
     void runTrial(Calibration::Motion motion, int level, double seconds);
     void createVariable();
     void createBlock();
+    bool createProcedure(const QString &name, const QStringList &params);  // false : nom vide ou déjà pris
     void updateMonitors();
     void showValue(const Block *reporter);
     void programLoaded();

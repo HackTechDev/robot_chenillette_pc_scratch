@@ -15,6 +15,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonDocument>
@@ -686,21 +688,55 @@ void Window::createVariable()
 
 void Window::createBlock()
 {
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, QStringLiteral("Nouveau bloc"),
-                                               QStringLiteral("Nom du bloc (ex. faire un carré) :"), QLineEdit::Normal,
-                                               QString(), &ok)
-                             .trimmed()
-                             .left(MaxBlockName);
-    if (!ok || name.isEmpty())
+    // Nom et paramètres facultatifs (ex. « faire un carré », paramètre « côté »)
+    QDialog dialog(this);
+    dialog.setWindowTitle(QStringLiteral("Nouveau bloc"));
+    dialog.setStyleSheet(CalibrationStyle);
+    auto *name = new QLineEdit;
+    name->setPlaceholderText(QStringLiteral("ex. faire un carré"));
+    name->setMaxLength(MaxBlockName);
+    QList<QLineEdit *> params;
+    auto *form = new QFormLayout;
+    form->addRow(QStringLiteral("Nom du bloc :"), name);
+    for (int i = 0; i < MaxParams; ++i) {
+        params.append(new QLineEdit);
+        params.last()->setPlaceholderText(i == 0 ? QStringLiteral("facultatif, ex. côté") : QStringLiteral("facultatif"));
+        params.last()->setMaxLength(MaxVariableName);
+        form->addRow(QStringLiteral("Paramètre %1 :").arg(i + 1), params.last());
+    }
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("Créer"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("Annuler"));
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->addLayout(form);
+    layout->addWidget(new QLabel(QStringLiteral("Les paramètres deviennent des cases à remplir dans le bloc,\n"
+                                                "et des valeurs à utiliser dans sa définition.")));
+    layout->addWidget(buttons);
+    if (dialog.exec() != QDialog::Accepted)
         return;
-    if (!canvas_->addProcedure(name)) {
+    createProcedure(name->text(), {params[0]->text(), params[1]->text()});
+}
+
+bool Window::createProcedure(const QString &rawName, const QStringList &rawParams)
+{
+    const QString name = rawName.trimmed();
+    QStringList params;
+    for (const QString &p : rawParams) {
+        if (!p.trimmed().isEmpty() && !params.contains(p.trimmed()))
+            params.append(p.trimmed());
+    }
+    if (name.isEmpty())
+        return false;
+    if (!canvas_->addProcedure(name, params)) {
         QMessageBox::information(this, QStringLiteral("Mes blocs"),
                                  QStringLiteral("Le bloc « %1 » existe déjà.").arg(name));
-        return;
+        return false;
     }
     status_->setText(QStringLiteral("Empiler les blocs sous « définir %1 », puis utiliser « %1 » depuis la palette")
                          .arg(name));
+    return true;
 }
 
 void Window::updateMonitors()

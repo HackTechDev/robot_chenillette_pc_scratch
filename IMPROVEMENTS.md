@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026 (faits : 21).
+Améliorations pas encore réalisées. Les numéros 1 à 20 viennent de la liste du 17/10/2026 (les numéros manquants sont déjà faits : 2 à 14, 16, 17) ; les numéros 21 à 36 ont été proposés le 18/10/2026 (faits : 21, 22).
 
 Ordre conseillé : **1** (tout en dépend), puis **25** et **26**, et **28** si l'essai réel montre une dérive.
 
@@ -15,10 +15,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 - **Calibrer le robot** avec l'assistant (⚙ Calibrer… sous la scène) : avancer, reculer, pivoter ↺ et ↻, à quelques vitesses (par exemple 2, 4, 6) ; vérifier ensuite avec les exemples Carré et Aller-retour (en cm et degrés) que le robot revient à son point de départ. Contrôler aussi la dérive latérale en ligne droite (chenilles inégales), que le calibrage ne corrige pas (voir 28).
 
 ## Programmation
-
-### 22. Paramètres pour Mes blocs
-
-« faire un carré de (20) cm » plutôt qu'une variable globale : paramètres déclarés à la création du bloc, reporters de paramètre utilisables dans la définition, valeurs passées à l'appel (pile d'appels dans `Runner`).
 
 ### 23. Bloc « dire … pendant N s »
 

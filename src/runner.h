@@ -59,7 +59,10 @@ private:
         const Block *loop;  // boucle qui répète la séquence (nullptr = script)
         int remaining;      // tours restants (répéter N fois)
         quint64 waits;      // waits_ au début du tour
+        QHash<QString, double> args;  // appel de mes blocs : valeurs des paramètres
+        bool call = false;
     };
+    double argument(const QString &name) const;  // paramètre de l'appel en cours
 
     double input(const Block *b, int i);  // valeur d'une entrée (nombre ou reporter)
     bool condition(const Block *b, int i);  // entrée de condition : vide = faux

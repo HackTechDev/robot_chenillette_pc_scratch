@@ -56,9 +56,10 @@ public:
     bool removeVariable(const QString &name);  // false si un bloc l'utilise encore
 
     // Mes blocs : scripts « définir nom »
-    QStringList procedures() const { return procedures_; }
+    QList<Procedure> procedures() const { return procedures_; }
     const Block *procedure(const QString &name) const;  // le plus haut s'il y en a plusieurs
-    bool addProcedure(const QString &name);  // pose « définir nom » sous les scripts ; false si déjà défini
+    // Pose « définir nom (paramètres) » sous les scripts ; false si déjà défini
+    bool addProcedure(const QString &name, const QStringList &params = {});
 
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
@@ -79,7 +80,7 @@ signals:
     void changed();
     void historyChanged();
     void variablesChanged(const QStringList &names);
-    void proceduresChanged(const QStringList &names);
+    void proceduresChanged(const QList<Procedure> &procedures);
     void zoomChanged(qreal zoom);
 
 protected:
@@ -172,7 +173,7 @@ private:
     Block *edited_ = nullptr;
     int editedInput_ = 0;
     QStringList variables_;
-    QStringList procedures_;
+    QList<Procedure> procedures_;
     std::vector<std::unique_ptr<Comment>> comments_;
     Comment *pressComment_ = nullptr;
     CommentAction commentAction_ = CommentAction::None;

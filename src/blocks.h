@@ -38,6 +38,7 @@ enum class Kind {
     Define, Call,  // mes blocs : « définir nom » (chapeau) et l'appel « nom »
     If, IfElse, RepeatUntil,
     Less, Equal, Greater, And, Or, Not,
+    ParamValue,  // mes blocs : valeur d'un paramètre, dans la définition
 };
 
 struct Spec {
@@ -58,6 +59,7 @@ inline bool hasBody(Shape s) { return s == Shape::C || s == Shape::CapC || s == 
 inline bool hasElse(Shape s) { return s == Shape::E; }
 inline bool isReporter(Shape s) { return s == Shape::Reporter || s == Shape::Boolean; }
 int inputCount(const Spec &s);
+inline constexpr int MaxParams = 2;  // paramètres d'un bloc personnalisé (= entrées d'un bloc)
 // Une entrée de ce type accepte ce reporter : nombre ← arrondi, condition ← hexagone (pas la touche)
 inline bool acceptsShape(Param p, Shape s)
 {
@@ -91,13 +93,22 @@ struct Block {
 
     Kind kind;
     std::array<Input, 2> inputs;
-    QString name;  // variable, ou bloc personnalisé
+    QString name;        // variable, bloc personnalisé ou paramètre
+    QStringList params;  // mes blocs (définir / appel) : noms des paramètres
     BlockPtr next;
     BlockPtr body;
     BlockPtr body2;  // « sinon »
 };
 
 Block *lastBlock(Block *b);
+int inputCount(const Block *b);  // un appel de mes blocs a une entrée par paramètre
+
+// Bloc personnalisé défini dans le programme
+struct Procedure {
+    QString name;
+    QStringList params;
+    bool operator==(const Procedure &) const = default;
+};
 
 // Valeurs : arrondies et bornées selon le paramètre ; virgule ou point acceptés
 double clampValue(Param p, double v);

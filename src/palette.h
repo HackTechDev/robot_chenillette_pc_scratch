@@ -18,7 +18,7 @@ public:
 
     void setLocked(bool on);  // pas de glisser pendant l'exécution
     void setVariables(const QStringList &names);
-    void setProcedures(const QStringList &names);  // blocs personnalisés définis
+    void setProcedures(const QList<Procedure> &procedures);  // blocs personnalisés définis
 
 signals:
     void createVariableRequested();
@@ -52,7 +52,7 @@ private:
     void rebuild();
 
     QStringList variables_;
-    QStringList procedures_;
+    QList<Procedure> procedures_;
     std::vector<BlockPtr> templates_;
     QList<blockview::Item> items_;
     QList<Heading> headings_;

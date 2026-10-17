@@ -33,11 +33,11 @@ void Palette::setVariables(const QStringList &names)
     rebuild();
 }
 
-void Palette::setProcedures(const QStringList &names)
+void Palette::setProcedures(const QList<Procedure> &procedures)
 {
-    if (names == procedures_)
+    if (procedures == procedures_)
         return;
-    procedures_ = names;
+    procedures_ = procedures;
     rebuild();
 }
 
@@ -73,8 +73,13 @@ void Palette::rebuild()
     Section &procs = sections.emplace_back();
     procs.heading = {QStringLiteral("Mes blocs"), QColor(specOf(Kind::Call).color), 0};
     procs.button = {QRectF(), QStringLiteral("Créer un bloc"), CreateBlock};
-    for (const QString &name : procedures_)
-        procs.blocks.push_back(named(Kind::Call, name));
+    for (const Procedure &p : procedures_) {
+        // L'appel (une entrée par paramètre), puis les paramètres à utiliser dans la définition
+        procs.blocks.push_back(named(Kind::Call, p.name));
+        procs.blocks.back()->params = p.params;
+        for (const QString &param : p.params)
+            procs.blocks.push_back(named(Kind::ParamValue, param));
+    }
 
     // Les Item gardent l'adresse de leur pointeur : templates_ n'est plus modifié ensuite
     templates_.clear();
