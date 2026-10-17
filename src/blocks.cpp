@@ -22,6 +22,10 @@ const Spec Specs[] = {
     {Kind::Backward, "backward", "reculer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 's', 1},
     {Kind::Left, "left", "pivoter ↺ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'q', 0.5},
     {Kind::Right, "right", "pivoter ↻ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'd', 0.5},
+    {Kind::GoForward, "go_forward", "démarrer avancer", Motion, Shape::Stack, Param::None, 'z', 0},
+    {Kind::GoBackward, "go_backward", "démarrer reculer", Motion, Shape::Stack, Param::None, 's', 0},
+    {Kind::GoLeft, "go_left", "démarrer pivoter ↺", Motion, Shape::Stack, Param::None, 'q', 0},
+    {Kind::GoRight, "go_right", "démarrer pivoter ↻", Motion, Shape::Stack, Param::None, 'd', 0},
     {Kind::Speed, "speed", "vitesse %1", Motion, Shape::Stack, Param::Speed, 0, SpeedLevelDefault},
     {Kind::Stop, "stop", "stop", Motion, Shape::Stack, Param::None, 0, 0},
     {Kind::ClawClose, "claw_close", "fermer la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'v', 1},
@@ -71,7 +75,8 @@ const QList<Category> &categories()
     static const QList<Category> list = {
         {QStringLiteral("Événements"), Events, {Kind::Start}},
         {QStringLiteral("Mouvement"), Motion,
-         {Kind::Forward, Kind::Backward, Kind::Left, Kind::Right, Kind::Speed, Kind::Stop}},
+         {Kind::Forward, Kind::Backward, Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft,
+          Kind::GoRight, Kind::Stop, Kind::Speed}},
         {QStringLiteral("Pince et tête"), Tools, {Kind::ClawClose, Kind::ClawOpen, Kind::HeadUp, Kind::HeadDown}},
         {QStringLiteral("Contrôle"), Control, {Kind::Wait, Kind::Repeat, Kind::Forever}},
     };

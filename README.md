@@ -72,6 +72,7 @@ Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 
 | pivoter ↺ / ↻ pendant N s | `q` / `d`, attente, stop |
 | fermer / ouvrir la pince pendant N s | `v` / `c`, attente, stop |
 | lever / baisser la tête pendant N s | `w` / `x`, attente, stop |
+| démarrer avancer / reculer / pivoter ↺ / ↻ | `z` / `s` / `q` / `d`, sans attente : le robot continue jusqu'au prochain stop ou mouvement |
 | vitesse N (0 à 9) | chiffre `N` → vitesse `(N + 1) × 40` |
 | stop | espace |
 | attendre N s | rien |
@@ -80,10 +81,13 @@ Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 
 
 Chaque exécution commence par remettre la vitesse par défaut (`4` → 200).
 
+Les blocs **démarrer …** permettent des mouvements continus, par exemple « démarrer avancer, attendre 2 s, démarrer pivoter ↻, attendre 0,5 s, stop » ; changer la vitesse pendant le mouvement ne l'arrête pas.
+
 ## Sécurité
 
 - **■**, **Échap**, **Déconnecter**, la fermeture de l'appli et la perte de liaison arrêtent le programme et envoient un stop ;
 - un bloc « pendant N s » envoie toujours un stop à la fin de sa durée (le firmware n'a pas de keep-alive) ;
+- après un bloc **démarrer …**, un stop est envoyé à la fin du programme et à chaque pause du pas à pas ;
 - une boucle sans attente rend la main à l'interface à chaque tour : ■ reste utilisable.
 
 Pour le dépannage Bluetooth, voir le README de la télécommande.

@@ -42,6 +42,7 @@ private:
     };
 
     void send(char cmd);
+    void stopRolling();
     void step();
     void onTimeout();
     void wait(double seconds);
@@ -52,6 +53,7 @@ private:
     QList<Frame> frames_;
     quint64 waits_ = 0;  // nombre d'attentes depuis le début
     bool moving_ = false;  // commande envoyée, stop à envoyer à la fin de l'attente
+    bool rolling_ = false; // « démarrer … » envoyé : le robot bouge jusqu'au prochain stop
     bool running_ = false;
     bool stepByStep_ = false;
     bool paused_ = false;

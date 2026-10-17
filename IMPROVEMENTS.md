@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2, 3, 4, 5, 6, 7, 8, 14, 16, 17).
+Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2, 3, 4, 5, 6, 7, 8, 10, 14, 16, 17).
 
 ## Priorité
 
@@ -19,10 +19,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 Notes jaunes à poser à côté des scripts (texte libre, déplaçables, enregistrées dans le fichier `.batmobile` et l'historique d'annulation).
 
 ## Nouveaux blocs
-
-### 10. Blocs sans durée
-
-« démarrer avancer », « démarrer tourner »… suivis d'un bloc « stop » explicite, pour des mouvements plus fluides. Le firmware n'a pas de keep-alive : garder un stop de sécurité en fin de programme et sur ■ (déjà le cas).
 
 ### 11. Chapeau « quand la touche [espace] est pressée »
 

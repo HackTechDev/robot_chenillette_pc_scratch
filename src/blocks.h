@@ -20,7 +20,9 @@ enum class Param { None, Seconds, Count, Speed };
 // L'ordre doit suivre la table Specs de blocks.cpp
 enum class Kind {
     Start,
-    Forward, Backward, Left, Right, Speed, Stop,
+    Forward, Backward, Left, Right,
+    GoForward, GoBackward, GoLeft, GoRight,  // sans durée : jusqu'au prochain stop
+    Speed, Stop,
     ClawClose, ClawOpen, HeadUp, HeadDown,
     Wait, Repeat, Forever,
 };
@@ -32,7 +34,7 @@ struct Spec {
     QRgb color;
     Shape shape;
     Param param;
-    char cmd;          // commande maintenue pendant la durée (0 = aucune)
+    char cmd;          // commande maintenue pendant la durée, ou jusqu'au stop si Param::None (0 = aucune)
     double def;        // valeur par défaut du paramètre
 };
 

@@ -54,6 +54,14 @@ void Runner::send(char cmd)
 {
     link_.send(cmd);  // sans effet si le robot n'est pas connecté
     emit sent(cmd);
+    if (cmd == Stop)
+        rolling_ = false;
+}
+
+void Runner::stopRolling()
+{
+    if (rolling_)
+        send(Stop);
 }
 
 void Runner::finish()
@@ -102,6 +110,7 @@ void Runner::step()
         const bool action = b->kind != Kind::Start && b->kind != Kind::Repeat && b->kind != Kind::Forever;
         if (action && stepByStep_) {
             if (acted_) {
+                stopRolling();  // en pause, le robot ne doit pas continuer à rouler
                 paused_ = true;
                 emit current(b);
                 emit paused(b);
@@ -129,11 +138,19 @@ void Runner::step()
             break;
         case Kind::Wait:
             return wait(b->value);
+        case Kind::GoForward:
+        case Kind::GoBackward:
+        case Kind::GoLeft:
+        case Kind::GoRight:
+            send(b->spec().cmd);
+            rolling_ = true;
+            break;
         default:
             send(b->spec().cmd);
             moving_ = true;
             return wait(b->value);
         }
     }
+    stopRolling();  // fin du programme : le robot s'arrête
     finish();
 }
