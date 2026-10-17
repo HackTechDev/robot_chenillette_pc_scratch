@@ -8,6 +8,8 @@
 #include <QPixmap>
 #include <QRectF>
 
+#include <array>
+
 class QMimeData;
 class QPainter;
 class QWidget;
@@ -16,7 +18,8 @@ class QWidget;
 namespace blockview {
 
 inline constexpr qreal Dome = 18;     // arrondi au-dessus d'un chapeau
-inline constexpr qreal RowH = 40;     // hauteur d'un bloc (ou de la tête d'une boucle)
+inline constexpr qreal RowH = 40;     // hauteur minimale d'un bloc (ou de la tête d'une boucle)
+inline constexpr qreal ReporterH = 30; // hauteur minimale d'un reporter
 inline constexpr qreal ArmW = 16;     // bras gauche d'une boucle
 inline constexpr qreal MinInner = 24; // corps de boucle vide
 inline constexpr qreal BottomH = 24;  // bas d'une boucle
@@ -30,9 +33,17 @@ struct Item {
     QPointF pos;               // coin haut gauche (haut de l'arrondi pour un chapeau)
     qreal width = 0;
     qreal height = 0;          // le bloc suivant commence à pos.y + height
+    qreal rowH = 0;            // hauteur de la ligne de texte (plus haute avec des reporters)
     QPainterPath path;
-    QRectF before, after;      // texte avant / après le paramètre
-    QRectF value;              // pastille du paramètre (vide s'il n'y en a pas)
+    struct Text {
+        QRectF rect;
+        QString text;
+    };
+    QList<Text> texts;
+    std::array<QRectF, 2> value;  // pastille de chaque entrée sans reporter (vide sinon)
+    QRectF var;                   // liste des variables (vide s'il n'y en a pas)
+
+    int valueAt(const QPointF &p) const;  // entrée dont la pastille contient p, ou -1
 };
 
 QFont font();

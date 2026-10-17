@@ -56,6 +56,7 @@ void Canvas::clear()
     commitEdit();
     scripts_.clear();
     addScript(FirstScript, std::make_unique<Block>(Kind::Start));
+    setVariables({});
     relayout();
     resetHistory();
 }
@@ -72,7 +73,12 @@ QJsonObject Canvas::save() const
             });
         }
     }
-    return {{QStringLiteral("format"), Format}, {QStringLiteral("version"), 1}, {QStringLiteral("scripts"), scripts}};
+    return {
+        {QStringLiteral("format"), Format},
+        {QStringLiteral("version"), 1},
+        {QStringLiteral("variables"), QJsonArray::fromStringList(variables_)},
+        {QStringLiteral("scripts"), scripts},
+    };
 }
 
 bool Canvas::load(const QJsonObject &o)
@@ -144,7 +150,45 @@ void Canvas::restore(const QJsonObject &o)
         if (BlockPtr top = blocksFromJson(s[QStringLiteral("blocks")].toArray()))
             addScript(QPointF(s[QStringLiteral("x")].toDouble(), s[QStringLiteral("y")].toDouble()), std::move(top));
     }
+    QStringList names;
+    for (const QJsonValue &v : o[QStringLiteral("variables")].toArray())
+        names.append(v.toString());
+    setVariables(names);
     relayout();
+}
+
+void Canvas::setVariables(QStringList names)
+{
+    for (const auto &s : scripts_)
+        collectVariables(s->top.get(), &names);
+    names.removeAll(QString());
+    names.removeDuplicates();
+    if (names == variables_)
+        return;
+    variables_ = names;
+    emit variablesChanged(variables_);
+}
+
+bool Canvas::addVariable(const QString &name)
+{
+    if (name.isEmpty() || variables_.contains(name))
+        return false;
+    setVariables(variables_ + QStringList{name});
+    edited();
+    return true;
+}
+
+bool Canvas::removeVariable(const QString &name)
+{
+    // Utilisée par un bloc : elle réapparaîtrait avec lui
+    QStringList used;
+    for (const auto &s : scripts_)
+        collectVariables(s->top.get(), &used);
+    if (used.contains(name) || !variables_.removeOne(name))
+        return false;
+    emit variablesChanged(variables_);
+    edited();
+    return true;
 }
 
 const Block *Canvas::startScript() const
@@ -154,7 +198,7 @@ const Block *Canvas::startScript() const
 
 const Block *Canvas::keyScript(int key) const
 {
-    return topScript([key](const Block *top) { return top->kind == Kind::KeyHat && int(top->value) == key; });
+    return topScript([key](const Block *top) { return top->kind == Kind::KeyHat && int(top->inputs[0].value) == key; });
 }
 
 const Block *Canvas::topScript(const std::function<bool(const Block *)> &match) const
@@ -243,23 +287,41 @@ Canvas::Snap Canvas::findSnap(BlockPtr &stack, const QPointF &topLeft) const
             best = {slot, before, at};
         }
     };
+    if (stack->spec().shape == Shape::Reporter) {
+        // Reporter : dans une entrée libre, près de sa pastille
+        QList<Item> tmp;
+        const qreal h = blockview::layout(stack, QPointF(), tmp);
+        for (const Item &it : items_) {
+            if (!acceptsReporter(it.block->spec().param))
+                continue;
+            for (int i = 0; i < 2; ++i) {
+                if (!it.value[i].isNull())
+                    consider(&it.block->inputs[i].reporter, nullptr, QPointF(it.value[i].left(), it.value[i].center().y()),
+                             topLeft + QPointF(0, h / 2));
+            }
+        }
+        return best;
+    }
     // Une boucle sans fin en bas de la pile : rien ne peut la suivre
     const bool cap = lastBlock(stack.get())->spec().shape == Shape::CapC;
 
     if (stack->spec().shape != Shape::Hat) {
         for (const Item &it : items_) {
             const Shape s = it.block->spec().shape;
+            if (s == Shape::Reporter)
+                continue;
             if (s != Shape::CapC && !(cap && it.block->next))
                 consider(&it.block->next, nullptr, it.pos + QPointF(0, it.height), topLeft);
             if (hasBody(s) && !(cap && it.block->body))
-                consider(&it.block->body, nullptr, it.pos + QPointF(blockview::ArmW, blockview::RowH), topLeft);
+                consider(&it.block->body, nullptr, it.pos + QPointF(blockview::ArmW, it.rowH), topLeft);
         }
     }
     if (!cap) {
         QList<Item> tmp;
         const qreal h = blockview::layout(stack, QPointF(), tmp);
         for (const auto &s : scripts_) {
-            if (s->top && s->top->spec().shape != Shape::Hat)
+            const Shape top = s->top ? s->top->spec().shape : Shape::Hat;
+            if (top != Shape::Hat && top != Shape::Reporter)
                 consider(nullptr, s.get(), s->pos, topLeft + QPointF(0, h));
         }
     }
@@ -351,9 +413,12 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
     pressItem_ = -1;
     if (i < 0 || e->button() != Qt::LeftButton)
         return;
-    // Clic sur la valeur : modification ; ailleurs sur le script : exécution (selon la fenêtre)
-    if (!items_[i].value.isNull() && items_[i].value.contains(toModel(e->position())))
-        return editValue(i);
+    // Clic sur une valeur ou une liste : modification ; ailleurs sur le script : exécution (selon la fenêtre)
+    const QPointF m = toModel(e->position());
+    if (const int input = items_[i].valueAt(m); input >= 0)
+        return editValue(i, input);
+    if (!items_[i].var.isNull() && items_[i].var.contains(m))
+        return chooseVariable(i);
     if (!running_)
         emit scriptClicked(itemScripts_[i]->top.get());
 }
@@ -362,8 +427,8 @@ void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
 {
     const QPointF m = toModel(e->position());
     const int i = itemAt(m);
-    if (e->button() != Qt::LeftButton || i < 0 || running_
-        || (!items_[i].value.isNull() && items_[i].value.contains(m)))
+    if (e->button() != Qt::LeftButton || i < 0 || running_ || items_[i].valueAt(m) >= 0
+        || (!items_[i].var.isNull() && items_[i].var.contains(m)))
         return mousePressEvent(e);
     pressItem_ = -1;  // le relâchement qui suit n'est pas un second clic
     emit scriptDoubleClicked(itemScripts_[i]->top.get());
@@ -518,21 +583,23 @@ void Canvas::endDrop()
 
 // --- Saisie d'une valeur ---
 
-void Canvas::editValue(int item)
+void Canvas::editValue(int item, int input)
 {
     const Item &it = items_[item];
     const Param param = it.block->spec().param;
     if (param == Param::Key)
         return chooseKey(item);
     edited_ = it.block;
+    editedInput_ = input;
     delete editor_->validator();
     editor_->setValidator(new QRegularExpressionValidator(QRegularExpression(valuePattern(param)), editor_));
-    editor_->setText(formatValue(param, it.block->value));
+    editor_->setText(formatValue(param, it.block->inputs[input].value));
     editor_->setStyleSheet(QStringLiteral("QLineEdit { background: #fff; color: #222; border: 2px solid #4C97FF;"
                                           " border-radius: %1px; font-weight: bold; font-size: %2px; }")
                                .arg(qRound(12 * zoom_))
                                .arg(qRound(13 * zoom_)));
-    QRect r = QRectF(it.value.topLeft() * zoom_, it.value.size() * zoom_).toAlignedRect().adjusted(-4, -2, 4, 2);
+    const QRectF pill = it.value[input];
+    QRect r = QRectF(pill.topLeft() * zoom_, pill.size() * zoom_).toAlignedRect().adjusted(-4, -2, 4, 2);
     r.setWidth(qMax(r.width(), qRound(56 * zoom_)));
     editor_->setGeometry(r);
     editor_->show();
@@ -544,7 +611,8 @@ void Canvas::chooseKey(int item)
 {
     // Liste déroulante : espace et flèches, puis lettres et chiffres en sous-menus
     Block *b = items_[item].block;
-    const QPoint at = mapToGlobal((items_[item].value.bottomLeft() * zoom_).toPoint());
+    double &value = b->inputs[0].value;
+    const QPoint at = mapToGlobal((items_[item].value[0].bottomLeft() * zoom_).toPoint());
     QMenu menu(this);
     QMenu *letters = nullptr;
     QMenu *digits = nullptr;
@@ -558,12 +626,32 @@ void Canvas::chooseKey(int item)
         QAction *a = target->addAction(name);
         a->setData(i);
         a->setCheckable(true);
-        a->setChecked(i == int(b->value));
+        a->setChecked(i == int(value));
     }
     const QAction *chosen = menu.exec(at);
-    if (!chosen || chosen->data().toInt() == int(b->value))
+    if (!chosen || chosen->data().toInt() == int(value))
         return;
-    b->value = chosen->data().toInt();
+    value = chosen->data().toInt();
+    relayout();
+    edited();
+}
+
+void Canvas::chooseVariable(int item)
+{
+    Block *b = items_[item].block;
+    const QPoint at = mapToGlobal((items_[item].var.bottomLeft() * zoom_).toPoint());
+    QMenu menu(this);
+    for (const QString &name : variables_) {
+        QAction *a = menu.addAction(name);
+        a->setCheckable(true);
+        a->setChecked(name == b->name);
+    }
+    if (variables_.isEmpty())
+        menu.addAction(QStringLiteral("(créer une variable dans la palette)"))->setEnabled(false);
+    const QAction *chosen = menu.exec(at);
+    if (!chosen || !chosen->isEnabled() || chosen->text() == b->name)
+        return;
+    b->name = chosen->text();
     relayout();
     edited();
 }
@@ -580,8 +668,9 @@ void Canvas::commitEdit()
     Block *b = std::exchange(edited_, nullptr);
     editor_->hide();  // déclenche editingFinished : edited_ est déjà remis à zéro
     double v = 0;
-    if (parseValue(b->spec().param, editor_->text(), &v) && v != b->value) {
-        b->value = v;
+    double &value = b->inputs[editedInput_].value;
+    if (parseValue(b->spec().param, editor_->text(), &v) && v != value) {
+        value = v;
         edited();
     }
     relayout();
@@ -598,7 +687,8 @@ void Canvas::wheelEvent(QWheelEvent *e)
     }
     const QPointF m = toModel(e->position());
     const int i = itemAt(m);
-    if (i < 0 || items_[i].value.isNull() || !items_[i].value.contains(m)) {
+    const int input = i >= 0 ? items_[i].valueAt(m) : -1;
+    if (input < 0) {
         wheelAccum_ = 0;
         return e->ignore();  // la vue défile
     }
@@ -608,24 +698,25 @@ void Canvas::wheelEvent(QWheelEvent *e)
     const int steps = wheelAccum_ / WheelNotch;
     wheelAccum_ -= steps * WheelNotch;
     if (steps != 0)
-        stepValue(items_[i].block, steps);
+        stepValue(items_[i].block, input, steps);
 }
 
-void Canvas::stepValue(Block *block, int steps)
+void Canvas::stepValue(Block *block, int input, int steps)
 {
     if (edited_)
         commitEdit();
     const Param param = block->spec().param;
-    double v = block->value;
+    double &value = block->inputs[input].value;
+    double v = value;
     for (int n = 0; n < qAbs(steps); ++n) {
         double step = 1;
         if (param == Param::Seconds)  // 0,1 s jusqu'à 2 s, puis 0,5 s
             step = (steps > 0 ? v >= 2 : v > 2) ? 0.5 : 0.1;
         v = clampValue(param, v + (steps > 0 ? step : -step));
     }
-    if (v == block->value)
+    if (v == value)
         return;
-    block->value = v;
+    value = v;
     relayout();
     wheelCommit_.start();
 }

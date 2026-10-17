@@ -19,6 +19,8 @@ public:
 
     void command(char cmd);  // même protocole que le robot
     void reset();            // robot au centre, trace effacée
+    // Variables affichées en haut à gauche, dans l'ordre (nom, valeur)
+    void setMonitors(const QList<QPair<QString, double>> &monitors);
 
     QSize sizeHint() const override;
     bool hasHeightForWidth() const override { return true; }
@@ -38,6 +40,7 @@ private:
     char motion_ = Stop;
     int speedLevel_ = SpeedLevelDefault;
     QList<QPointF> trail_;
+    QList<QPair<QString, double>> monitors_;
     QTimer timer_;
     QElapsedTimer clock_;
 };

@@ -51,6 +51,10 @@ private:
     void setRunButtonsEnabled(bool on);
     void onPaused();
     void onFinished();
+    void createVariable();
+    void updateMonitors();
+    void showValue(const Block *reporter);
+    void programLoaded();
     void newProgram();
     void openExample(const QString &title, const QString &path);
     void openProgram();

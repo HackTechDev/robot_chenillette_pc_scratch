@@ -15,29 +15,39 @@ constexpr QRgb Events = 0xFFBF00;
 constexpr QRgb Motion = 0x4C97FF;
 constexpr QRgb Tools = 0x9966FF;
 constexpr QRgb Control = 0xFFAB19;
+constexpr QRgb Variables = 0xFF8C1A;
+constexpr QRgb Operators = 0x59C059;
 
 const Spec Specs[] = {
-    {Kind::Start, "start", "quand ▶ est cliqué", Events, Shape::Hat, Param::None, 0, 0},
-    {Kind::KeyHat, "key", "quand la touche %1 est pressée", Events, Shape::Hat, Param::Key, 0, 0},
-    {Kind::Forward, "forward", "avancer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'z', 1},
-    {Kind::Backward, "backward", "reculer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 's', 1},
-    {Kind::Left, "left", "pivoter ↺ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'q', 0.5},
-    {Kind::Right, "right", "pivoter ↻ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'd', 0.5},
-    {Kind::GoForward, "go_forward", "démarrer avancer", Motion, Shape::Stack, Param::None, 'z', 0},
-    {Kind::GoBackward, "go_backward", "démarrer reculer", Motion, Shape::Stack, Param::None, 's', 0},
-    {Kind::GoLeft, "go_left", "démarrer pivoter ↺", Motion, Shape::Stack, Param::None, 'q', 0},
-    {Kind::GoRight, "go_right", "démarrer pivoter ↻", Motion, Shape::Stack, Param::None, 'd', 0},
-    {Kind::Speed, "speed", "vitesse %1", Motion, Shape::Stack, Param::Speed, 0, SpeedLevelDefault},
-    {Kind::Stop, "stop", "stop", Motion, Shape::Stack, Param::None, 0, 0},
-    {Kind::ClawClose, "claw_close", "fermer la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'v', 1},
-    {Kind::ClawOpen, "claw_open", "ouvrir la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'c', 1},
-    {Kind::HeadUp, "head_up", "lever la tête pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'w', 0.5},
-    {Kind::HeadDown, "head_down", "baisser la tête pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'x', 0.5},
-    {Kind::Wait, "wait", "attendre %1 s", Control, Shape::Stack, Param::Seconds, 0, 1},
-    {Kind::Repeat, "repeat", "répéter %1 fois", Control, Shape::C, Param::Count, 0, 4},
-    {Kind::Forever, "forever", "répéter indéfiniment", Control, Shape::CapC, Param::None, 0, 0},
+    {Kind::Start, "start", "quand ▶ est cliqué", Events, Shape::Hat, Param::None, 0, 0, 0},
+    {Kind::KeyHat, "key", "quand la touche %1 est pressée", Events, Shape::Hat, Param::Key, 0, 0, 0},
+    {Kind::Forward, "forward", "avancer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'z', 1, 0},
+    {Kind::Backward, "backward", "reculer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 's', 1, 0},
+    {Kind::Left, "left", "pivoter ↺ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'q', 0.5, 0},
+    {Kind::Right, "right", "pivoter ↻ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'd', 0.5, 0},
+    {Kind::GoForward, "go_forward", "démarrer avancer", Motion, Shape::Stack, Param::None, 'z', 0, 0},
+    {Kind::GoBackward, "go_backward", "démarrer reculer", Motion, Shape::Stack, Param::None, 's', 0, 0},
+    {Kind::GoLeft, "go_left", "démarrer pivoter ↺", Motion, Shape::Stack, Param::None, 'q', 0, 0},
+    {Kind::GoRight, "go_right", "démarrer pivoter ↻", Motion, Shape::Stack, Param::None, 'd', 0, 0},
+    {Kind::Speed, "speed", "vitesse %1", Motion, Shape::Stack, Param::Speed, 0, SpeedLevelDefault, 0},
+    {Kind::Stop, "stop", "stop", Motion, Shape::Stack, Param::None, 0, 0, 0},
+    {Kind::ClawClose, "claw_close", "fermer la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'v', 1, 0},
+    {Kind::ClawOpen, "claw_open", "ouvrir la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'c', 1, 0},
+    {Kind::HeadUp, "head_up", "lever la tête pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'w', 0.5, 0},
+    {Kind::HeadDown, "head_down", "baisser la tête pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'x', 0.5, 0},
+    {Kind::Wait, "wait", "attendre %1 s", Control, Shape::Stack, Param::Seconds, 0, 1, 0},
+    {Kind::Repeat, "repeat", "répéter %1 fois", Control, Shape::C, Param::Count, 0, 4, 0},
+    {Kind::Forever, "forever", "répéter indéfiniment", Control, Shape::CapC, Param::None, 0, 0, 0},
+    {Kind::SetVar, "set_var", "mettre %v à %1", Variables, Shape::Stack, Param::Number, 0, 0, 0},
+    {Kind::ChangeVar, "change_var", "ajouter %1 à %v", Variables, Shape::Stack, Param::Number, 0, 1, 0},
+    {Kind::Variable, "var", "%n", Variables, Shape::Reporter, Param::None, 0, 0, 0},
+    {Kind::Add, "add", "%1 + %2", Operators, Shape::Reporter, Param::Number, 0, 0, 0},
+    {Kind::Subtract, "subtract", "%1 − %2", Operators, Shape::Reporter, Param::Number, 0, 0, 0},
+    {Kind::Multiply, "multiply", "%1 × %2", Operators, Shape::Reporter, Param::Number, 0, 1, 1},
+    {Kind::Divide, "divide", "%1 ÷ %2", Operators, Shape::Reporter, Param::Number, 0, 1, 1},
+    {Kind::Random, "random", "nombre aléatoire entre %1 et %2", Operators, Shape::Reporter, Param::Number, 0, 1, 10},
 };
-static_assert(std::size(Specs) == size_t(Kind::Forever) + 1);
+static_assert(std::size(Specs) == size_t(Kind::Random) + 1);
 
 // Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
 struct KeyDef {
@@ -85,6 +95,7 @@ Range range(Param p)
     case Param::Count: return {0, 100, 0};
     case Param::Speed: return {0, SpeedLevels - 1, 0};
     case Param::Key: return {0, double(keys().size() - 1), 0};
+    case Param::Number: return {-9999, 9999, 2};
     case Param::None: break;
     }
     return {0, 0, 0};
@@ -97,6 +108,17 @@ const Spec &specOf(Kind kind)
     return Specs[int(kind)];
 }
 
+int inputCount(const Spec &s)
+{
+    const QString text = QString::fromUtf8(s.text);
+    return text.contains(QLatin1String("%2")) ? 2 : text.contains(QLatin1String("%1")) ? 1 : 0;
+}
+
+QRgb variablesColor()
+{
+    return Variables;
+}
+
 const QList<Category> &categories()
 {
     static const QList<Category> list = {
@@ -106,11 +128,17 @@ const QList<Category> &categories()
           Kind::GoRight, Kind::Stop, Kind::Speed}},
         {QStringLiteral("Pince et tête"), Tools, {Kind::ClawClose, Kind::ClawOpen, Kind::HeadUp, Kind::HeadDown}},
         {QStringLiteral("Contrôle"), Control, {Kind::Wait, Kind::Repeat, Kind::Forever}},
+        {QStringLiteral("Opérateurs"), Operators,
+         {Kind::Add, Kind::Subtract, Kind::Multiply, Kind::Divide, Kind::Random}},
     };
     return list;
 }
 
-Block::Block(Kind k) : kind(k), value(specOf(k).def) {}
+Block::Block(Kind k) : kind(k)
+{
+    inputs[0].value = specOf(k).def;
+    inputs[1].value = specOf(k).def2;
+}
 
 Block *lastBlock(Block *b)
 {
@@ -131,10 +159,19 @@ QString formatValue(Param p, double v)
     if (p == Param::Key)
         return keyName(int(clampValue(p, v))) + QStringLiteral(" ▾");  // liste déroulante
     QString text = QString::number(clampValue(p, v), 'f', range(p).decimals);
-    // Durées : une décimale au moins (« 1,0 »), deux si besoin (« 0,25 »)
-    while (text.endsWith('0') && text.indexOf('.') >= 0 && text.size() - text.indexOf('.') > 2)
+    // Durées : une décimale au moins (« 1,0 »), deux si besoin (« 0,25 ») ; nombres : « 1 », « 0,5 »
+    const qsizetype minDecimals = p == Param::Seconds ? 1 : 0;
+    while (text.indexOf('.') >= 0 && text.size() - text.indexOf('.') - 1 > minDecimals
+           && (text.endsWith('0') || text.endsWith('.')))
+        text.chop(1);
+    if (text.endsWith('.'))
         text.chop(1);
     return text.replace('.', ',');
+}
+
+QString formatNumber(double v)
+{
+    return QString::number(std::round(v * 100) / 100, 'g', 10).replace('.', ',');
 }
 
 bool parseValue(Param p, QString text, double *out)
@@ -152,6 +189,7 @@ QString valuePattern(Param p)
     case Param::Seconds: return QStringLiteral("\\d{0,2}([.,]\\d{0,2})?");
     case Param::Count: return QStringLiteral("\\d{0,3}");
     case Param::Speed: return QStringLiteral("\\d?");
+    case Param::Number: return QStringLiteral("-?\\d{0,4}([.,]\\d{0,2})?");
     case Param::Key:  // choisie dans un menu
     case Param::None: break;
     }
@@ -177,17 +215,56 @@ int keyIndex(int qtKey)
     return -1;
 }
 
+namespace {
+
+const QString InputKeys[2][2] = {
+    {QStringLiteral("value"), QStringLiteral("arg")},
+    {QStringLiteral("value2"), QStringLiteral("arg2")},
+};
+
+QJsonObject blockToJson(const Block *b)
+{
+    const Spec &s = b->spec();
+    QJsonObject o{{QStringLiteral("kind"), QLatin1String(s.id)}};
+    for (int i = 0; i < inputCount(s); ++i) {
+        o[InputKeys[i][0]] = b->inputs[i].value;
+        if (b->inputs[i].reporter)
+            o[InputKeys[i][1]] = blockToJson(b->inputs[i].reporter.get());
+    }
+    if (!b->name.isEmpty())
+        o[QStringLiteral("name")] = b->name;
+    if (b->body)
+        o[QStringLiteral("body")] = blocksToJson(b->body.get());
+    return o;
+}
+
+// Un bloc seul (sans ses suivants) ; nullptr si inconnu
+BlockPtr blockFromJson(const QJsonObject &o)
+{
+    const Spec *s = findSpec(o[QStringLiteral("kind")].toString());
+    if (!s)
+        return nullptr;
+    auto b = std::make_unique<Block>(s->kind);
+    const double defs[2] = {s->def, s->def2};
+    for (int i = 0; i < inputCount(*s); ++i) {
+        b->inputs[i].value = clampValue(s->param, o[InputKeys[i][0]].toDouble(defs[i]));
+        BlockPtr r = blockFromJson(o[InputKeys[i][1]].toObject());
+        if (r && r->spec().shape == Shape::Reporter && acceptsReporter(s->param))
+            b->inputs[i].reporter = std::move(r);
+    }
+    b->name = o[QStringLiteral("name")].toString();
+    if (hasBody(s->shape))
+        b->body = blocksFromJson(o[QStringLiteral("body")].toArray(), false);
+    return b;
+}
+
+}  // namespace
+
 QJsonArray blocksToJson(const Block *first)
 {
     QJsonArray out;
-    for (const Block *b = first; b; b = b->next.get()) {
-        QJsonObject o{{QStringLiteral("kind"), QLatin1String(b->spec().id)}};
-        if (b->spec().param != Param::None)
-            o[QStringLiteral("value")] = b->value;
-        if (b->body)
-            o[QStringLiteral("body")] = blocksToJson(b->body.get());
-        out.append(o);
-    }
+    for (const Block *b = first; b; b = b->next.get())
+        out.append(blockToJson(b));
     return out;
 }
 
@@ -196,20 +273,29 @@ BlockPtr blocksFromJson(const QJsonArray &array, bool top)
     BlockPtr first;
     BlockPtr *slot = &first;
     for (const QJsonValue &v : array) {
-        const QJsonObject o = v.toObject();
-        const Spec *s = findSpec(o[QStringLiteral("kind")].toString());
-        // Chapeau seulement en tête de script
-        if (!s || (s->shape == Shape::Hat && (!top || slot != &first)))
+        BlockPtr b = blockFromJson(v.toObject());
+        if (!b)
             continue;
-        auto b = std::make_unique<Block>(s->kind);
-        if (s->param != Param::None)
-            b->value = clampValue(s->param, o[QStringLiteral("value")].toDouble(s->def));
-        if (hasBody(s->shape))
-            b->body = blocksFromJson(o[QStringLiteral("body")].toArray(), false);
+        const Shape shape = b->spec().shape;
+        // Chapeau seulement en tête de script ; un reporter seulement seul, comme script
+        if ((shape == Shape::Hat || shape == Shape::Reporter) && (!top || slot != &first))
+            continue;
         *slot = std::move(b);
-        if (s->shape == Shape::CapC)  // rien après une boucle sans fin
+        if (shape == Shape::CapC || shape == Shape::Reporter)  // rien après
             break;
         slot = &(*slot)->next;
     }
     return first;
+}
+
+void collectVariables(const Block *first, QStringList *names)
+{
+    for (const Block *b = first; b; b = b->next.get()) {
+        if (!b->name.isEmpty() && (b->kind == Kind::Variable || b->kind == Kind::SetVar || b->kind == Kind::ChangeVar)
+            && !names->contains(b->name))
+            names->append(b->name);
+        for (const Input &in : b->inputs)
+            collectVariables(in.reporter.get(), names);
+        collectVariables(b->body.get(), names);
+    }
 }

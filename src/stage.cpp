@@ -1,5 +1,7 @@
 #include "stage.h"
 
+#include "blocks.h"
+
 #include <QPainter>
 #include <QPainterPath>
 
@@ -50,6 +52,12 @@ void Stage::reset()
     pos_ = QPointF(StageW / 2, StageH / 2);
     heading_ = 0;
     trail_ = {pos_};
+    update();
+}
+
+void Stage::setMonitors(const QList<QPair<QString, double>> &monitors)
+{
+    monitors_ = monitors;
     update();
 }
 
@@ -155,6 +163,31 @@ void Stage::paintEvent(QPaintEvent *)
     p.setBrush(QColor(0x11, 0x11, 0x11));
     p.drawEllipse(QPointF(0, -2 - head_ * 5), 2.5, 2.5);
     p.restore();
+
+    // Variables, comme les moniteurs de Scratch
+    QFont mf = font();
+    mf.setPixelSize(12);
+    mf.setBold(true);
+    p.setFont(mf);
+    const QFontMetricsF fm(mf);
+    qreal my = 6;
+    for (const auto &[name, value] : monitors_) {
+        const QString v = formatNumber(value);
+        const qreal nameW = fm.horizontalAdvance(name), valueW = qMax(24.0, fm.horizontalAdvance(v) + 12);
+        const QRectF box(6, my, nameW + valueW + 20, 22);
+        p.setPen(QPen(QColor(0xC8, 0xC8, 0xC8), 1));
+        p.setBrush(QColor(0xE9, 0xEE, 0xF2));
+        p.drawRoundedRect(box, 4, 4);
+        p.setPen(QColor(0x57, 0x5E, 0x75));
+        p.drawText(QRectF(box.left() + 6, my, nameW + 1, 22), Qt::AlignVCenter, name);
+        const QRectF pill(box.right() - valueW - 4, my + 3, valueW, 16);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(variablesColor()));
+        p.drawRoundedRect(pill, 8, 8);
+        p.setPen(Qt::white);
+        p.drawText(pill, Qt::AlignCenter, v);
+        my += 26;
+    }
 
     // Jauge de la tête
     const QRectF gauge(StageW - 18, StageH - 70, 8, 56);

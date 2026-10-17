@@ -2,6 +2,7 @@
 
 #include "blocks.h"
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QTimer>
@@ -29,10 +30,16 @@ public:
     bool isRunning() const { return running_; }
     bool isPaused() const { return paused_; }
 
+    // Variables : gardent leur valeur d'une exécution à l'autre (comme dans Scratch)
+    double variable(const QString &name) const { return vars_.value(name); }
+    void resetVariables();
+    double evaluate(const Block *reporter);  // valeur d'un reporter seul (clic dessus)
+
 signals:
     void current(const Block *block);  // nullptr à la fin
     void sent(char cmd);               // commande envoyée (ou simulée)
     void paused(const Block *next);    // pas à pas : en attente avant ce bloc
+    void variableChanged(const QString &name, double value);
     void finished();
 
 private:
@@ -43,6 +50,9 @@ private:
         quint64 waits;      // waits_ au début du tour
     };
 
+    double input(const Block *b, int i);  // valeur d'une entrée (nombre ou reporter)
+    double input(const Block *b, int i, Param p) { return clampValue(p, input(b, i)); }
+    void setVariable(const QString &name, double value);
     void send(char cmd);
     void stopRolling();
     void step();
@@ -53,6 +63,7 @@ private:
     Link &link_;
     QTimer timer_;
     QList<Frame> frames_;
+    QHash<QString, double> vars_;
     quint64 waits_ = 0;  // nombre d'attentes depuis le début
     bool moving_ = false;  // commande envoyée, stop à envoyer à la fin de l'attente
     bool rolling_ = false; // « démarrer … » envoyé : le robot bouge jusqu'au prochain stop

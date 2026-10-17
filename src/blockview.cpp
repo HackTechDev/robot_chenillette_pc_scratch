@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QMimeData>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QWidget>
 
 namespace blockview {
@@ -75,19 +76,19 @@ QPainterPath hatPath(qreal w, qreal h)
     return p;
 }
 
-QPainterPath loopPath(qreal w, qreal inner, bool cap)
+QPainterPath loopPath(qreal w, qreal rowH, qreal inner, bool cap)
 {
-    const qreal innerBottom = RowH + inner;
+    const qreal innerBottom = rowH + inner;
     const qreal h = innerBottom + BottomH;
     QPainterPath p;
     p.moveTo(0, Radius);
     p.quadTo(0, 0, Radius, 0);
     edgeRight(p, 0, 0, w - Radius, true);
     p.quadTo(w, 0, w, Radius);
-    p.lineTo(w, RowH - Radius);
-    p.quadTo(w, RowH, w - Radius, RowH);
-    edgeLeft(p, ArmW, RowH, ArmW + Radius, true);  // languette vers le premier bloc du corps
-    p.quadTo(ArmW, RowH, ArmW, RowH + Radius);
+    p.lineTo(w, rowH - Radius);
+    p.quadTo(w, rowH, w - Radius, rowH);
+    edgeLeft(p, ArmW, rowH, ArmW + Radius, true);  // languette vers le premier bloc du corps
+    p.quadTo(ArmW, rowH, ArmW, rowH + Radius);
     p.lineTo(ArmW, innerBottom - Radius);
     p.quadTo(ArmW, innerBottom, ArmW + Radius, innerBottom);
     edgeRight(p, ArmW, innerBottom, w - Radius, true);  // encoche du dernier bloc du corps
@@ -100,18 +101,123 @@ QPainterPath loopPath(qreal w, qreal inner, bool cap)
     return p;
 }
 
+QPainterPath reporterPath(qreal w, qreal h)
+{
+    QPainterPath p;
+    p.addRoundedRect(QRectF(0, 0, w, h), h / 2, h / 2);
+    return p;
+}
+
 qreal minWidth(Shape s)
 {
     switch (s) {
     case Shape::Hat: return 120;
     case Shape::C:
     case Shape::CapC: return 100;
+    case Shape::Reporter: return 40;
     case Shape::Stack: break;
     }
     return 60;
 }
 
+// Morceaux du texte d'un bloc : texte, ou %1 / %2 / %v / %n
+QStringList tokens(const Spec &s)
+{
+    static const QRegularExpression re(QStringLiteral("(%[12vn])"));
+    QStringList out;
+    const QString text = QString::fromUtf8(s.text);
+    qsizetype last = 0;
+    for (auto it = re.globalMatch(text); it.hasNext();) {
+        const QRegularExpressionMatch m = it.next();
+        const QString before = text.mid(last, m.capturedStart() - last).trimmed();
+        if (!before.isEmpty())
+            out.append(before);
+        out.append(m.captured());
+        last = m.capturedEnd();
+    }
+    const QString rest = text.mid(last).trimmed();
+    if (!rest.isEmpty())
+        out.append(rest);
+    return out;
+}
+
+QString varLabel(const Block *b)
+{
+    return (b->name.isEmpty() ? QStringLiteral("?") : b->name) + QStringLiteral(" ▾");
+}
+
+QSizeF measure(const Block *b, const QFontMetricsF &fm);
+
+// Hauteur de la ligne : de quoi contenir les reporters des entrées
+qreal rowHeight(const Block *b, const QFontMetricsF &fm)
+{
+    const bool reporter = b->spec().shape == Shape::Reporter;
+    qreal h = reporter ? ReporterH : RowH;
+    for (const Input &in : b->inputs) {
+        if (in.reporter)
+            h = qMax(h, measure(in.reporter.get(), fm).height() + (reporter ? 6 : 10));
+    }
+    return h;
+}
+
+// Place les morceaux de texte à partir de left, sur la ligne [rowTop, rowTop + rowH] ;
+// renvoie la largeur du bloc. it et childPos peuvent être nuls (mesure seule).
+qreal placeTokens(const Block *b, const QFontMetricsF &fm, qreal left, qreal rowTop, qreal rowH, Item *it,
+                  std::array<QPointF, 2> *childPos)
+{
+    const Spec &s = b->spec();
+    const qreal pad = s.shape == Shape::Reporter ? 8 : Pad;
+    qreal x = left + pad;
+    bool first = true;
+    for (const QString &t : tokens(s)) {
+        if (!first)
+            x += Gap;
+        first = false;
+        if (t == QLatin1String("%1") || t == QLatin1String("%2")) {
+            const int i = t == QLatin1String("%1") ? 0 : 1;
+            if (const Block *r = b->inputs[i].reporter.get()) {
+                const QSizeF size = measure(r, fm);
+                if (childPos)
+                    (*childPos)[i] = QPointF(x, rowTop + (rowH - size.height()) / 2);
+                x += size.width();
+            } else {
+                const qreal w = qMax(PillMinW, fm.horizontalAdvance(formatValue(s.param, b->inputs[i].value)) + 16);
+                if (it)
+                    it->value[i] = QRectF(x, rowTop + (rowH - PillH) / 2, w, PillH);
+                x += w;
+            }
+        } else if (t == QLatin1String("%v")) {
+            const qreal w = fm.horizontalAdvance(varLabel(b)) + 16;
+            if (it)
+                it->var = QRectF(x, rowTop + (rowH - PillH) / 2, w, PillH);
+            x += w;
+        } else {
+            const QString text = t == QLatin1String("%n") ? b->name : t;
+            const qreal w = fm.horizontalAdvance(text) + 1;
+            if (it)
+                it->texts.append({QRectF(x, rowTop, w, rowH), text});
+            x += w;
+        }
+    }
+    return qMax(minWidth(s.shape), x - left + pad);
+}
+
+QSizeF measure(const Block *b, const QFontMetricsF &fm)
+{
+    const qreal rowH = rowHeight(b, fm);
+    return QSizeF(placeTokens(b, fm, 0, 0, rowH, nullptr, nullptr), rowH);
+}
+
 }  // namespace
+
+int Item::valueAt(const QPointF &p) const
+{
+    for (int i = 0; i < 2; ++i) {
+        if (!value[i].isNull() && value[i].contains(p))
+            return i;
+    }
+    return -1;
+}
 
 QFont font()
 {
@@ -128,45 +234,42 @@ qreal layout(BlockPtr &first, QPointF pos, QList<Item> &out)
     for (BlockPtr *slot = &first; *slot; slot = &(*slot)->next) {
         Block *b = slot->get();
         const Spec &s = b->spec();
-        const QStringList parts = QString::fromUtf8(s.text).split(QStringLiteral("%1"));
-        const QString before = parts.value(0).trimmed();
-        const QString after = parts.value(1).trimmed();
+        const qreal rowH = rowHeight(b, fm);
         const qreal rowTop = pos.y() + (s.shape == Shape::Hat ? Dome : 0);
 
         Item it;
         it.block = b;
         it.slot = slot;
         it.pos = pos;
-        qreal x = pos.x() + Pad;
-        it.before = QRectF(x, rowTop, fm.horizontalAdvance(before) + 1, RowH);
-        x = it.before.right();
-        if (s.param != Param::None) {
-            const qreal w = qMax(PillMinW, fm.horizontalAdvance(formatValue(s.param, b->value)) + 16);
-            it.value = QRectF(x + Gap, rowTop + (RowH - PillH) / 2, w, PillH);
-            x = it.value.right();
-        }
-        if (!after.isEmpty()) {
-            it.after = QRectF(x + Gap, rowTop, fm.horizontalAdvance(after) + 1, RowH);
-            x = it.after.right();
-        }
-        it.width = qMax(minWidth(s.shape), x - pos.x() + Pad);
+        it.rowH = rowH;
+        std::array<QPointF, 2> childPos;
+        it.width = placeTokens(b, fm, pos.x(), rowTop, rowH, &it, &childPos);
 
         const int index = out.size();
         out.append(it);
+        // Reporters des entrées, dessinés par-dessus le bloc
+        for (int i = 0; i < 2; ++i) {
+            if (b->inputs[i].reporter)
+                layout(b->inputs[i].reporter, childPos[i], out);
+        }
         switch (s.shape) {
         case Shape::Hat:
-            out[index].height = Dome + RowH;
-            out[index].path = hatPath(it.width, Dome + RowH);
+            out[index].height = Dome + rowH;
+            out[index].path = hatPath(it.width, Dome + rowH);
             break;
         case Shape::Stack:
-            out[index].height = RowH;
-            out[index].path = stackPath(it.width, RowH);
+            out[index].height = rowH;
+            out[index].path = stackPath(it.width, rowH);
+            break;
+        case Shape::Reporter:
+            out[index].height = rowH;
+            out[index].path = reporterPath(it.width, rowH);
             break;
         case Shape::C:
         case Shape::CapC: {
-            const qreal inner = qMax(MinInner, layout(b->body, pos + QPointF(ArmW, RowH), out));
-            out[index].height = RowH + inner + BottomH;
-            out[index].path = loopPath(it.width, inner, s.shape == Shape::CapC);
+            const qreal inner = qMax(MinInner, layout(b->body, pos + QPointF(ArmW, rowH), out));
+            out[index].height = rowH + inner + BottomH;
+            out[index].path = loopPath(it.width, rowH, inner, s.shape == Shape::CapC);
             break;
         }
         }
@@ -192,7 +295,8 @@ void paint(QPainter &p, const Item &item, bool highlight, bool ghost)
         p.drawPath(item.path);
         return;
     }
-    const Spec &s = item.block->spec();
+    const Block *b = item.block;
+    const Spec &s = b->spec();
     const QColor color(s.color);
     const QColor border = color.darker(130);
     if (highlight) {
@@ -205,18 +309,26 @@ void paint(QPainter &p, const Item &item, bool highlight, bool ghost)
     p.setBrush(color);
     p.drawPath(item.path);
 
-    const QStringList parts = QString::fromUtf8(s.text).split(QStringLiteral("%1"));
     p.setFont(font());
     p.setPen(Qt::white);
-    p.drawText(item.before, Qt::AlignLeft | Qt::AlignVCenter, parts.value(0).trimmed());
-    if (!item.after.isNull())
-        p.drawText(item.after, Qt::AlignLeft | Qt::AlignVCenter, parts.value(1).trimmed());
-    if (!item.value.isNull()) {
+    for (const Item::Text &t : item.texts)
+        p.drawText(t.rect, Qt::AlignLeft | Qt::AlignVCenter, t.text);
+    for (int i = 0; i < 2; ++i) {
+        if (item.value[i].isNull())
+            continue;
         p.setPen(QPen(border, 1));
         p.setBrush(Qt::white);
-        p.drawRoundedRect(item.value, PillH / 2, PillH / 2);
+        p.drawRoundedRect(item.value[i], PillH / 2, PillH / 2);
         p.setPen(QColor(0x57, 0x5E, 0x75));
-        p.drawText(item.value, Qt::AlignCenter, formatValue(s.param, item.block->value));
+        p.drawText(item.value[i], Qt::AlignCenter, formatValue(s.param, b->inputs[i].value));
+    }
+    if (!item.var.isNull()) {
+        // Liste des variables : pastille foncée, comme dans Scratch
+        p.setPen(QPen(border, 1));
+        p.setBrush(color.darker(115));
+        p.drawRoundedRect(item.var, 4, 4);
+        p.setPen(Qt::white);
+        p.drawText(item.var, Qt::AlignCenter, varLabel(b));
     }
 }
 

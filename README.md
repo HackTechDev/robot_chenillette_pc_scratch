@@ -79,8 +79,12 @@ Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 
 | attendre N s | rien |
 | répéter N fois { … } | boucle |
 | répéter indéfiniment { … } | boucle sans fin (jusqu'à ■) ; aucun bloc ne peut la suivre |
+| mettre [var ▾] à N / ajouter N à [var ▾] | change une variable |
+| (var), (a + b), (a − b), (a × b), (a ÷ b), (nombre aléatoire entre a et b) | **reporters** (blocs arrondis) : une valeur, à glisser dans n'importe quelle entrée numérique |
 
 Chaque exécution commence par remettre la vitesse par défaut (`4` → 200), sauf celle d'un script de touche.
+
+**Variables et opérateurs** : **Créer une variable** (section Variables de la palette) ajoute un reporter à son nom, et les blocs « mettre … à » / « ajouter … à ». Les reporters (variables et opérateurs verts) se glissent dans une entrée — durée, nombre de tours, vitesse, ou entrée d'un autre opérateur — pour calculer une valeur pendant l'exécution, par exemple une spirale : « répéter 10 fois : ajouter 0,1 à durée, avancer pendant (durée) s, pivoter ↻ 0,5 s ». Le nom de variable se choisit dans la liste ▾ du bloc. Les valeurs calculées sont bornées à l'usage (durée 0–60 s, vitesse 0–9…) ; une division par zéro donne 0 ; un nombre aléatoire entre deux entiers est entier. Les variables gardent leur valeur d'une exécution à l'autre (comme dans Scratch) et s'affichent en haut à gauche de la scène. Un clic sur un reporter seul affiche sa valeur. Clic droit sur une variable de la palette : la supprimer (si aucun bloc ne l'utilise).
 
 **Scripts de touche** : le bloc **quand la touche … est pressée** (touche choisie dans sa liste : espace, flèches, lettres, chiffres ; molette pour la changer) lance son script quand on appuie sur la touche, pour piloter le robot au clavier. Une nouvelle touche remplace le script de touche en cours ; pendant un programme ▶ ou le pas à pas, les touches sont ignorées. Un appui maintenu ne relance pas le script. Les touches ne sont pas prises pendant la saisie d'un nombre.
 

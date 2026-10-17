@@ -15,6 +15,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QJsonDocument>
 #include <QKeyEvent>
 #include <QLabel>
@@ -44,6 +45,7 @@ const QList<QPair<QString, QString>> Examples = {
     {QStringLiteral("Danse (sans fin, ■ pour arrêter)"), QStringLiteral(":/examples/danse.batmobile")},
 };
 
+constexpr int MaxVariableName = 16;
 const QString UntitledName = QStringLiteral("sans titre");
 const QString AutosaveFormat = QStringLiteral("batmobile-scratch-autosave");
 constexpr int AutosaveDelayMs = 1000;
@@ -152,7 +154,17 @@ Window::Window(QWidget *parent) : QWidget(parent)
     paletteScroll->setWidget(palette_);
     paletteScroll->setWidgetResizable(true);
     paletteScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    paletteScroll->setFixedWidth(palette_->minimumWidth() + paletteScroll->verticalScrollBar()->sizeHint().width() + 4);
+    auto fitPalette = [paletteScroll](int width) {
+        paletteScroll->setFixedWidth(width + paletteScroll->verticalScrollBar()->sizeHint().width() + 4);
+    };
+    fitPalette(palette_->minimumWidth());
+    connect(palette_, &Palette::widthChanged, this, fitPalette);  // nom de variable plus long
+    connect(palette_, &Palette::createVariableRequested, this, &Window::createVariable);
+    connect(palette_, &Palette::deleteVariableRequested, this, [this](const QString &name) {
+        if (!canvas_->removeVariable(name))
+            QMessageBox::information(this, QStringLiteral("Variable"),
+                                     QStringLiteral("La variable « %1 » est encore utilisée par des blocs.").arg(name));
+    });
 
     canvas_ = new Canvas;
     auto *canvasScroll = new QScrollArea;
@@ -160,12 +172,23 @@ Window::Window(QWidget *parent) : QWidget(parent)
     canvasScroll->setWidgetResizable(true);
     // Robot connecté : un simple clic ne doit pas le faire bouger par erreur
     connect(canvas_, &Canvas::scriptClicked, this, [this](const Block *first) {
+        if (first->spec().shape == Shape::Reporter)
+            return showValue(first);
         if (!connected_)
             run(first);
         else if (!runner_.isRunning())
             status_->setText(QStringLiteral("Robot connecté : double-clic sur un script pour l'exécuter"));
     });
-    connect(canvas_, &Canvas::scriptDoubleClicked, this, [this](const Block *first) { run(first); });
+    connect(canvas_, &Canvas::scriptDoubleClicked, this, [this](const Block *first) {
+        if (first->spec().shape == Shape::Reporter)
+            return showValue(first);
+        run(first);
+    });
+    connect(canvas_, &Canvas::variablesChanged, this, [this](const QStringList &names) {
+        palette_->setVariables(names);
+        updateMonitors();
+    });
+    connect(&runner_, &Runner::variableChanged, this, &Window::updateMonitors);
     connect(canvas_, &Canvas::changed, this, [this] { setModified(canvas_->isModified()); });
     connect(&runner_, &Runner::current, canvas_, &Canvas::setCurrent);
     connect(&runner_, &Runner::finished, this, &Window::onFinished);
@@ -566,12 +589,47 @@ void Window::restoreAutosave()
     status_->setText(QStringLiteral("Programme de la dernière séance retrouvé"));
 }
 
+void Window::createVariable()
+{
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, QStringLiteral("Nouvelle variable"),
+                                               QStringLiteral("Nom de la variable :"), QLineEdit::Normal, QString(), &ok)
+                             .trimmed()
+                             .left(MaxVariableName);
+    if (!ok || name.isEmpty())
+        return;
+    if (!canvas_->addVariable(name))
+        QMessageBox::information(this, QStringLiteral("Variable"),
+                                 QStringLiteral("La variable « %1 » existe déjà.").arg(name));
+}
+
+void Window::updateMonitors()
+{
+    QList<QPair<QString, double>> monitors;
+    for (const QString &name : canvas_->variables())
+        monitors.append({name, runner_.variable(name)});
+    stage_->setMonitors(monitors);
+}
+
+void Window::showValue(const Block *reporter)
+{
+    // Clic sur un reporter seul : sa valeur, comme la bulle de Scratch
+    status_->setText(QStringLiteral("Valeur : %1").arg(formatNumber(runner_.evaluate(reporter))));
+}
+
+void Window::programLoaded()
+{
+    runner_.resetVariables();  // nouveau programme : variables à zéro
+    updateMonitors();
+}
+
 void Window::newProgram()
 {
     runner_.stop();
     if (!confirmDiscard())
         return;
     canvas_->clear();
+    programLoaded();
     fileName_.clear();
     untitled_ = UntitledName;
     setModified(false);
@@ -585,6 +643,7 @@ void Window::openExample(const QString &title, const QString &path)
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly) || !canvas_->load(QJsonDocument::fromJson(file.readAll()).object()))
         return;
+    programLoaded();
     // Pas de fichier : « Enregistrer… » demandera où le copier
     fileName_.clear();
     untitled_ = QStringLiteral("%1 (exemple)").arg(title.section(QStringLiteral(" ("), 0, 0));
@@ -611,6 +670,7 @@ void Window::openProgram()
                               QStringLiteral("%1 n'est pas un programme BatMobile.").arg(QFileInfo(path).fileName()));
         return;
     }
+    programLoaded();
     fileName_ = path;
     setModified(false);
 }

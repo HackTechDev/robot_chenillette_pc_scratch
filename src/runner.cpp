@@ -3,6 +3,10 @@
 #include "config.h"
 #include "link.h"
 
+#include <QRandomGenerator>
+
+#include <cmath>
+
 namespace {
 
 // Durée minimale d'une attente, et pause d'un tour de boucle sans attente
@@ -49,6 +53,50 @@ void Runner::stop()
     moving_ = false;
     send(Stop);
     finish();
+}
+
+void Runner::resetVariables()
+{
+    vars_.clear();
+}
+
+double Runner::evaluate(const Block *r)
+{
+    auto arg = [&](int i) { return input(r, i); };
+    switch (r->kind) {
+    case Kind::Variable: return vars_.value(r->name);
+    case Kind::Add: return arg(0) + arg(1);
+    case Kind::Subtract: return arg(0) - arg(1);
+    case Kind::Multiply: return arg(0) * arg(1);
+    case Kind::Divide: {
+        const double d = arg(1);
+        return d == 0 ? 0 : arg(0) / d;
+    }
+    case Kind::Random: {
+        // Entiers si les deux bornes sont entières, comme dans Scratch
+        const double a = arg(0), b = arg(1);
+        const double lo = std::min(a, b), hi = std::max(a, b);
+        if (lo == std::floor(lo) && hi == std::floor(hi))
+            return std::floor(lo + QRandomGenerator::global()->bounded(hi - lo + 1));
+        return lo + QRandomGenerator::global()->bounded(hi - lo);
+    }
+    default: return 0;
+    }
+}
+
+double Runner::input(const Block *b, int i)
+{
+    const Input &in = b->inputs[i];
+    return in.reporter ? evaluate(in.reporter.get()) : in.value;
+}
+
+void Runner::setVariable(const QString &name, double value)
+{
+    if (name.isEmpty())
+        return;
+    value = std::round(value * 100) / 100;  // pas de 0,30000000000000004
+    vars_[name] = value;
+    emit variableChanged(name, value);
 }
 
 void Runner::send(char cmd)
@@ -126,20 +174,26 @@ void Runner::step()
         case Kind::KeyHat:
             break;
         case Kind::Repeat:
-            if (b->value >= 1)
-                frames_.append({b->body.get(), b, int(b->value), waits_});  // f n'est plus valide
+            if (const int n = int(input(b, 0, Param::Count)); n >= 1)
+                frames_.append({b->body.get(), b, n, waits_});  // f n'est plus valide
             break;
         case Kind::Forever:
             frames_.append({b->body.get(), b, 0, waits_});
             break;
         case Kind::Speed:
-            send(char('0' + int(b->value)));
+            send(char('0' + int(input(b, 0, Param::Speed))));
             break;
         case Kind::Stop:
             send(Stop);
             break;
         case Kind::Wait:
-            return wait(b->value);
+            return wait(input(b, 0, Param::Seconds));
+        case Kind::SetVar:
+            setVariable(b->name, input(b, 0));
+            break;
+        case Kind::ChangeVar:
+            setVariable(b->name, vars_.value(b->name) + input(b, 0));
+            break;
         case Kind::GoForward:
         case Kind::GoBackward:
         case Kind::GoLeft:
@@ -148,9 +202,11 @@ void Runner::step()
             rolling_ = true;
             break;
         default:
+            if (!b->spec().cmd)
+                break;  // reporter seul : rien à envoyer
             send(b->spec().cmd);
             moving_ = true;
-            return wait(b->value);
+            return wait(input(b, 0, Param::Seconds));
         }
     }
     stopRolling();  // fin du programme : le robot s'arrête

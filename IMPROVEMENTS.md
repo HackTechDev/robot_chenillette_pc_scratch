@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2, 3, 4, 5, 6, 7, 8, 10, 11, 14, 16, 17).
+Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 14, 16, 17).
 
 ## Priorité
 
@@ -19,10 +19,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 Notes jaunes à poser à côté des scripts (texte libre, déplaçables, enregistrées dans le fichier `.batmobile` et l'historique d'annulation).
 
 ## Nouveaux blocs
-
-### 12. Variables et opérateurs
-
-Par exemple une durée qui augmente à chaque tour pour tracer une spirale. Demande des blocs « reporter » (valeurs arrondies, emboîtables dans les pastilles) : chantier important dans `blockview` et `Runner`.
 
 ### 13. Mes blocs
 

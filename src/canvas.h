@@ -48,6 +48,11 @@ public:
     void arrangeScripts();  // en colonne, dans l'ordre de haut en bas
     void removeAll();
 
+    // Variables du programme (enregistrées avec lui, annulables)
+    QStringList variables() const { return variables_; }
+    bool addVariable(const QString &name);  // false si le nom existe déjà
+    bool removeVariable(const QString &name);  // false si un bloc l'utilise encore
+
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
     // Script le plus haut commençant par « quand la touche … » pour cette touche (indice keyIndex)
@@ -66,6 +71,7 @@ signals:
     void scriptDoubleClicked(const Block *first);
     void changed();
     void historyChanged();
+    void variablesChanged(const QStringList &names);
     void zoomChanged(qreal zoom);
 
 protected:
@@ -89,7 +95,7 @@ private:
 
     // Point d'accroche d'une pile déposée
     struct Snap {
-        BlockPtr *slot = nullptr;  // insérée à cet endroit (après un bloc ou dans une boucle)
+        BlockPtr *slot = nullptr;  // insérée à cet endroit (après un bloc, dans une boucle ou une entrée)
         Script *before = nullptr;  // ou placée au-dessus de ce script
         QPointF at;
         bool valid() const { return slot || before; }
@@ -104,7 +110,7 @@ private:
     QScrollArea *scrollArea() const;
     QPointF viewCenter() const;
     void setZoom(qreal zoom, const QPointF &anchor);  // anchor (widget) reste sous la souris
-    void stepValue(Block *block, int steps);
+    void stepValue(Block *block, int input, int steps);
     int itemAt(const QPointF &pos) const;
     Snap findSnap(BlockPtr &stack, const QPointF &topLeft) const;
     void showGhost(const Snap &snap);
@@ -114,8 +120,10 @@ private:
     void addScript(const QPointF &pos, BlockPtr top);
     void pruneScripts();  // jamais pendant un glisser : un Item peut pointer sur Script::top
     void startDrag(int item);
-    void editValue(int item);
+    void editValue(int item, int input);
     void chooseKey(int item);
+    void chooseVariable(int item);
+    void setVariables(QStringList names);  // complétée par les noms utilisés dans les scripts
     void commitEdit();
     void removeBlock(int item);
     void duplicate(int item);
@@ -142,6 +150,8 @@ private:
     QSet<const Block *> ghostBlocks_;
     QLineEdit *editor_;
     Block *edited_ = nullptr;
+    int editedInput_ = 0;
+    QStringList variables_;
     QList<QJsonObject> history_;
     int historyIndex_ = 0;
     QJsonObject saved_;
