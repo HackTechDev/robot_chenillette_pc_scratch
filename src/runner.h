@@ -21,7 +21,9 @@ class Runner : public QObject
 public:
     explicit Runner(Link &link, QObject *parent = nullptr);
 
-    void start(const Block *first, bool stepByStep = false);
+    // resetSpeed : remettre la vitesse par défaut (pas pour un script de touche, qui
+    // garde la vitesse réglée par un autre script de touche)
+    void start(const Block *first, bool stepByStep = false, bool resetSpeed = true);
     void resume(bool stepByStep);
     void stop();  // arrête le programme et le robot
     bool isRunning() const { return running_; }

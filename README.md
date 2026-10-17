@@ -68,6 +68,7 @@ Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 
 | Bloc | Envoyé au robot |
 |------|-----------------|
 | quand ▶ est cliqué | début du script |
+| quand la touche [espace ▾] est pressée | début d'un script lancé au clavier |
 | avancer / reculer pendant N s | `z` / `s`, attente N s, puis stop |
 | pivoter ↺ / ↻ pendant N s | `q` / `d`, attente, stop |
 | fermer / ouvrir la pince pendant N s | `v` / `c`, attente, stop |
@@ -79,7 +80,9 @@ Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 
 | répéter N fois { … } | boucle |
 | répéter indéfiniment { … } | boucle sans fin (jusqu'à ■) ; aucun bloc ne peut la suivre |
 
-Chaque exécution commence par remettre la vitesse par défaut (`4` → 200).
+Chaque exécution commence par remettre la vitesse par défaut (`4` → 200), sauf celle d'un script de touche.
+
+**Scripts de touche** : le bloc **quand la touche … est pressée** (touche choisie dans sa liste : espace, flèches, lettres, chiffres ; molette pour la changer) lance son script quand on appuie sur la touche, pour piloter le robot au clavier. Une nouvelle touche remplace le script de touche en cours ; pendant un programme ▶ ou le pas à pas, les touches sont ignorées. Un appui maintenu ne relance pas le script. Les touches ne sont pas prises pendant la saisie d'un nombre.
 
 Les blocs **démarrer …** permettent des mouvements continus, par exemple « démarrer avancer, attendre 2 s, démarrer pivoter ↻, attendre 0,5 s, stop » ; changer la vitesse pendant le mouvement ne l'arrête pas.
 

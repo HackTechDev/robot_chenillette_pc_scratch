@@ -149,9 +149,19 @@ void Canvas::restore(const QJsonObject &o)
 
 const Block *Canvas::startScript() const
 {
+    return topScript([](const Block *top) { return top->kind == Kind::Start; });
+}
+
+const Block *Canvas::keyScript(int key) const
+{
+    return topScript([key](const Block *top) { return top->kind == Kind::KeyHat && int(top->value) == key; });
+}
+
+const Block *Canvas::topScript(const std::function<bool(const Block *)> &match) const
+{
     const Script *best = nullptr;
     for (const auto &s : scripts_) {
-        if (s->top && s->top->kind == Kind::Start
+        if (s->top && match(s->top.get())
             && (!best || s->pos.y() < best->pos.y() || (s->pos.y() == best->pos.y() && s->pos.x() < best->pos.x())))
             best = s.get();
     }
@@ -512,6 +522,8 @@ void Canvas::editValue(int item)
 {
     const Item &it = items_[item];
     const Param param = it.block->spec().param;
+    if (param == Param::Key)
+        return chooseKey(item);
     edited_ = it.block;
     delete editor_->validator();
     editor_->setValidator(new QRegularExpressionValidator(QRegularExpression(valuePattern(param)), editor_));
@@ -526,6 +538,34 @@ void Canvas::editValue(int item)
     editor_->show();
     editor_->setFocus();
     editor_->selectAll();
+}
+
+void Canvas::chooseKey(int item)
+{
+    // Liste déroulante : espace et flèches, puis lettres et chiffres en sous-menus
+    Block *b = items_[item].block;
+    const QPoint at = mapToGlobal((items_[item].value.bottomLeft() * zoom_).toPoint());
+    QMenu menu(this);
+    QMenu *letters = nullptr;
+    QMenu *digits = nullptr;
+    for (int i = 0; i < keyCount(); ++i) {
+        const QString name = keyName(i);
+        QMenu *target = &menu;
+        if (name.size() == 1 && name[0].isLetter() && name[0].isLower())
+            target = letters ? letters : (letters = menu.addMenu(QStringLiteral("lettres")));
+        else if (name.size() == 1 && name[0].isDigit())
+            target = digits ? digits : (digits = menu.addMenu(QStringLiteral("chiffres")));
+        QAction *a = target->addAction(name);
+        a->setData(i);
+        a->setCheckable(true);
+        a->setChecked(i == int(b->value));
+    }
+    const QAction *chosen = menu.exec(at);
+    if (!chosen || chosen->data().toInt() == int(b->value))
+        return;
+    b->value = chosen->data().toInt();
+    relayout();
+    edited();
 }
 
 void Canvas::commitEdit()

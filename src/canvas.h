@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <QWidget>
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -49,6 +50,8 @@ public:
 
     // Script le plus haut commençant par « quand ▶ est cliqué » (nullptr s'il n'y en a pas)
     const Block *startScript() const;
+    // Script le plus haut commençant par « quand la touche … » pour cette touche (indice keyIndex)
+    const Block *keyScript(int key) const;
 
     // Pendant l'exécution : pas de modification de la structure (le Runner garde des pointeurs)
     void setRunning(bool on);
@@ -96,6 +99,7 @@ private:
     void resetHistory();
     void restore(const QJsonObject &o);
     void relayout();
+    const Block *topScript(const std::function<bool(const Block *)> &match) const;
     QPointF toModel(const QPointF &widgetPos) const { return widgetPos / zoom_; }
     QScrollArea *scrollArea() const;
     QPointF viewCenter() const;
@@ -111,6 +115,7 @@ private:
     void pruneScripts();  // jamais pendant un glisser : un Item peut pointer sur Script::top
     void startDrag(int item);
     void editValue(int item);
+    void chooseKey(int item);
     void commitEdit();
     void removeBlock(int item);
     void duplicate(int item);

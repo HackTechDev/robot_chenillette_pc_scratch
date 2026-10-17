@@ -18,6 +18,7 @@ constexpr QRgb Control = 0xFFAB19;
 
 const Spec Specs[] = {
     {Kind::Start, "start", "quand ▶ est cliqué", Events, Shape::Hat, Param::None, 0, 0},
+    {Kind::KeyHat, "key", "quand la touche %1 est pressée", Events, Shape::Hat, Param::Key, 0, 0},
     {Kind::Forward, "forward", "avancer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'z', 1},
     {Kind::Backward, "backward", "reculer pendant %1 s", Motion, Shape::Stack, Param::Seconds, 's', 1},
     {Kind::Left, "left", "pivoter ↺ pendant %1 s", Motion, Shape::Stack, Param::Seconds, 'q', 0.5},
@@ -37,6 +38,31 @@ const Spec Specs[] = {
     {Kind::Forever, "forever", "répéter indéfiniment", Control, Shape::CapC, Param::None, 0, 0},
 };
 static_assert(std::size(Specs) == size_t(Kind::Forever) + 1);
+
+// Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
+struct KeyDef {
+    QString name;
+    int key;
+};
+
+const QList<KeyDef> &keys()
+{
+    static const QList<KeyDef> list = [] {
+        QList<KeyDef> l = {
+            {QStringLiteral("espace"), Qt::Key_Space},
+            {QStringLiteral("↑"), Qt::Key_Up},
+            {QStringLiteral("↓"), Qt::Key_Down},
+            {QStringLiteral("←"), Qt::Key_Left},
+            {QStringLiteral("→"), Qt::Key_Right},
+        };
+        for (char c = 'a'; c <= 'z'; ++c)
+            l.append({QString(QChar(c)), Qt::Key_A + (c - 'a')});
+        for (char c = '0'; c <= '9'; ++c)
+            l.append({QString(QChar(c)), Qt::Key_0 + (c - '0')});
+        return l;
+    }();
+    return list;
+}
 
 const Spec *findSpec(const QString &id)
 {
@@ -58,6 +84,7 @@ Range range(Param p)
     case Param::Seconds: return {0, 60, 2};  // 0,25 s = un huitième de tour
     case Param::Count: return {0, 100, 0};
     case Param::Speed: return {0, SpeedLevels - 1, 0};
+    case Param::Key: return {0, double(keys().size() - 1), 0};
     case Param::None: break;
     }
     return {0, 0, 0};
@@ -73,7 +100,7 @@ const Spec &specOf(Kind kind)
 const QList<Category> &categories()
 {
     static const QList<Category> list = {
-        {QStringLiteral("Événements"), Events, {Kind::Start}},
+        {QStringLiteral("Événements"), Events, {Kind::Start, Kind::KeyHat}},
         {QStringLiteral("Mouvement"), Motion,
          {Kind::Forward, Kind::Backward, Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft,
           Kind::GoRight, Kind::Stop, Kind::Speed}},
@@ -101,6 +128,8 @@ double clampValue(Param p, double v)
 
 QString formatValue(Param p, double v)
 {
+    if (p == Param::Key)
+        return keyName(int(clampValue(p, v))) + QStringLiteral(" ▾");  // liste déroulante
     QString text = QString::number(clampValue(p, v), 'f', range(p).decimals);
     // Durées : une décimale au moins (« 1,0 »), deux si besoin (« 0,25 »)
     while (text.endsWith('0') && text.indexOf('.') >= 0 && text.size() - text.indexOf('.') > 2)
@@ -123,9 +152,29 @@ QString valuePattern(Param p)
     case Param::Seconds: return QStringLiteral("\\d{0,2}([.,]\\d{0,2})?");
     case Param::Count: return QStringLiteral("\\d{0,3}");
     case Param::Speed: return QStringLiteral("\\d?");
+    case Param::Key:  // choisie dans un menu
     case Param::None: break;
     }
     return {};
+}
+
+int keyCount()
+{
+    return keys().size();
+}
+
+QString keyName(int index)
+{
+    return keys().value(index).name;
+}
+
+int keyIndex(int qtKey)
+{
+    for (int i = 0; i < keys().size(); ++i) {
+        if (keys()[i].key == qtKey)
+            return i;
+    }
+    return -1;
 }
 
 QJsonArray blocksToJson(const Block *first)

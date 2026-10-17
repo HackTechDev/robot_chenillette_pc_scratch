@@ -30,6 +30,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *e) override;
+    bool eventFilter(QObject *o, QEvent *e) override;  // touches des blocs « quand la touche … »
 
 private:
     // Connexion (comme la télécommande)
@@ -44,6 +45,8 @@ private:
     void onLost();
 
     // Programme
+    void runKeyScript(const Block *first, int key);
+    bool startRun(const Block *first, bool stepByStep, bool resetSpeed, const QString &status);
     void runOrContinue(bool stepByStep);  // ▶ / ⏭ : démarre, ou reprend après une pause
     void setRunButtonsEnabled(bool on);
     void onPaused();
@@ -62,6 +65,7 @@ private:
     Link link_;
     Runner runner_{link_};
     bool connected_ = false;
+    bool keyRun_ = false;  // l'exécution en cours vient d'une touche
     QString connectedName_;
     Pairing *pairing_ = nullptr;
     bool modified_ = false;

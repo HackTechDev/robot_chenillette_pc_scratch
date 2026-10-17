@@ -15,11 +15,11 @@ enum class Shape {
     CapC,   // boucle sans fin : rien en dessous
 };
 
-enum class Param { None, Seconds, Count, Speed };
+enum class Param { None, Seconds, Count, Speed, Key };
 
 // L'ordre doit suivre la table Specs de blocks.cpp
 enum class Kind {
-    Start,
+    Start, KeyHat,
     Forward, Backward, Left, Right,
     GoForward, GoBackward, GoLeft, GoRight,  // sans durée : jusqu'au prochain stop
     Speed, Stop,
@@ -68,6 +68,11 @@ double clampValue(Param p, double v);
 QString formatValue(Param p, double v);
 bool parseValue(Param p, QString text, double *out);
 QString valuePattern(Param p);  // expression régulière de saisie
+
+// Touches du bloc « quand la touche … est pressée » : valeur = indice dans cette liste
+int keyCount();
+QString keyName(int index);
+int keyIndex(int qtKey);  // -1 si la touche n'est pas proposée
 
 // Pile de blocs (le bloc et ses suivants) ↔ JSON ; les blocs inconnus sont ignorés
 QJsonArray blocksToJson(const Block *first);

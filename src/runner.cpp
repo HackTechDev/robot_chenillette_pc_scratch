@@ -17,14 +17,15 @@ Runner::Runner(Link &link, QObject *parent) : QObject(parent), link_(link)
     connect(&timer_, &QTimer::timeout, this, &Runner::onTimeout);
 }
 
-void Runner::start(const Block *first, bool stepByStep)
+void Runner::start(const Block *first, bool stepByStep, bool resetSpeed)
 {
     stop();
     running_ = true;
     stepByStep_ = stepByStep;
     acted_ = true;  // pas à pas : arrêt avant le premier bloc d'action
     frames_ = {{first, nullptr, 0, waits_}};
-    send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
+    if (resetSpeed)
+        send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
     step();
 }
 
@@ -107,7 +108,7 @@ void Runner::step()
         }
 
         const Block *b = f.next;
-        const bool action = b->kind != Kind::Start && b->kind != Kind::Repeat && b->kind != Kind::Forever;
+        const bool action = b->spec().shape == Shape::Stack;
         if (action && stepByStep_) {
             if (acted_) {
                 stopRolling();  // en pause, le robot ne doit pas continuer à rouler
@@ -122,6 +123,7 @@ void Runner::step()
         emit current(b);
         switch (b->kind) {
         case Kind::Start:
+        case Kind::KeyHat:
             break;
         case Kind::Repeat:
             if (b->value >= 1)

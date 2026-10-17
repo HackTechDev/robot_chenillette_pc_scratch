@@ -7,6 +7,7 @@
 #include "palette.h"
 #include "stage.h"
 
+#include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
@@ -15,6 +16,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QJsonDocument>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -283,6 +285,8 @@ Window::Window(QWidget *parent) : QWidget(parent)
     autosaveTimer_.setInterval(AutosaveDelayMs);
     connect(&autosaveTimer_, &QTimer::timeout, this, &Window::autosave);
 
+    qApp->installEventFilter(this);  // touches reçues quel que soit le widget qui a le focus
+
     refreshDevices();
     restoreAutosave();
     setModified(canvas_->isModified());
@@ -421,6 +425,35 @@ void Window::setConnected(bool on)
 
 // --- Exécution ---
 
+bool Window::eventFilter(QObject *o, QEvent *e)
+{
+    if (e->type() != QEvent::KeyPress || QApplication::activeWindow() != this || QApplication::activePopupWidget()
+        || qobject_cast<QLineEdit *>(QApplication::focusWidget()))
+        return QWidget::eventFilter(o, e);
+    const auto *k = static_cast<QKeyEvent *>(e);
+    if (k->isAutoRepeat() || (k->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+        return QWidget::eventFilter(o, e);
+    const int key = keyIndex(k->key());
+    const Block *first = key >= 0 ? canvas_->keyScript(key) : nullptr;
+    if (!first)
+        return QWidget::eventFilter(o, e);  // touche sans script : comportement normal (flèches…)
+    runKeyScript(first, key);
+    return true;
+}
+
+void Window::runKeyScript(const Block *first, int key)
+{
+    if (runner_.isRunning()) {
+        // Programme ▶ ou pas à pas en cours : les touches ne l'interrompent pas
+        if (!keyRun_ || runner_.isPaused())
+            return;
+        runner_.stop();  // une nouvelle touche remplace le script de touche en cours
+    }
+    if (startRun(first, false, false,
+                 QStringLiteral("Touche « %1 » : script en cours… (■ ou Échap pour arrêter)").arg(keyName(key))))
+        keyRun_ = runner_.isRunning();
+}
+
 void Window::runOrContinue(bool stepByStep)
 {
     if (!runner_.isPaused())
@@ -447,18 +480,26 @@ void Window::run(const Block *first, bool stepByStep)
 {
     if (runner_.isRunning())
         return;
+    startRun(first, stepByStep, true,
+             connected_ ? QStringLiteral("Programme en cours… (■ ou Échap pour arrêter)")
+                        : QStringLiteral("Simulation, robot non connecté… (■ ou Échap pour arrêter)"));
+}
+
+bool Window::startRun(const Block *first, bool stepByStep, bool resetSpeed, const QString &status)
+{
     if (!first) {
         QMessageBox::information(this, QStringLiteral("Programme"),
                                  QStringLiteral("Ajouter le bloc « quand ▶ est cliqué » en haut d'un script."));
-        return;
+        return false;
     }
+    keyRun_ = false;
     canvas_->setRunning(true);
     canvas_->setFocus();  // termine une saisie en cours
     palette_->setLocked(true);
     setRunButtonsEnabled(false);
-    status_->setText(connected_ ? QStringLiteral("Programme en cours… (■ ou Échap pour arrêter)")
-                                : QStringLiteral("Simulation, robot non connecté… (■ ou Échap pour arrêter)"));
-    runner_.start(first, stepByStep);
+    status_->setText(status);  // avant start : un programme instantané se termine tout de suite
+    runner_.start(first, stepByStep, resetSpeed);
+    return true;
 }
 
 void Window::onFinished()
