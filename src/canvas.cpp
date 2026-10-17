@@ -518,52 +518,7 @@ void Canvas::paintEvent(QPaintEvent *e)
     for (const Item &it : ghostItems_)
         blockview::paint(p, it, false, true);
 
-    // Liaison d'un commentaire attaché : de la droite de la ligne du bloc au bandeau de la note
-    p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1.5));
-    for (const auto &c : comments_) {
-        if (const int i = itemOf(c->blockId); c->blockId && i >= 0) {
-            const Item &it = items_[i];
-            const qreal rowTop = it.pos.y() + (it.block->spec().shape == Shape::Hat ? blockview::Dome : 0);
-            p.drawLine(QPointF(it.pos.x() + it.width, rowTop + it.rowH / 2),
-                       QPointF(c->rect.left(), c->rect.top() + CommentHeader / 2));
-        }
-    }
-
-    // Commentaires, au-dessus des blocs
-    QFont f = font();
-    f.setPixelSize(12);
-    p.setFont(f);
-    for (const auto &c : comments_) {
-        const QRectF r = c->rect;
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0, 0, 0, 60));
-        p.drawRoundedRect(r.translated(2, 3), 6, 6);  // ombre
-        p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1));
-        p.setBrush(CommentColor);
-        p.drawRoundedRect(r, 6, 6);
-        p.setPen(Qt::NoPen);
-        p.setBrush(CommentHeaderColor);
-        QPainterPath header;
-        header.addRoundedRect(QRectF(r.left(), r.top(), r.width(), CommentHeader + 6), 6, 6);
-        p.drawPath(header.intersected([&] {
-            QPainterPath clip;
-            clip.addRect(QRectF(r.left(), r.top(), r.width(), CommentHeader));
-            return clip;
-        }()));
-        if (c.get() != editedComment_) {
-            p.setPen(QColor(0x57, 0x4D, 0x1E));
-            p.save();
-            const QRectF body = r.adjusted(6, CommentHeader + 2, -6, -4);
-            p.setClipRect(body);
-            p.drawText(body, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
-                       c->text.isEmpty() ? QStringLiteral("(clic pour écrire)") : c->text);
-            p.restore();
-        }
-        // Poignée de redimensionnement
-        p.setPen(QPen(QColor(0xB8, 0xA8, 0x45), 1.5));
-        for (qreal d = 4; d <= 10; d += 3)
-            p.drawLine(QPointF(r.right() - d, r.bottom() - 2), QPointF(r.right() - 2, r.bottom() - d));
-    }
+    paintComments(p);
 }
 
 void Canvas::mousePressEvent(QMouseEvent *e)
@@ -1357,4 +1312,75 @@ void Canvas::placeAttachedComments()
         }
         ++it;
     }
+}
+
+void Canvas::paintComments(QPainter &p) const
+{
+    // Liaison d'un commentaire attaché : de la droite de la ligne du bloc au bandeau de la note
+    p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1.5));
+    for (const auto &c : comments_) {
+        if (const int i = itemOf(c->blockId); c->blockId && i >= 0) {
+            const Item &it = items_[i];
+            const qreal rowTop = it.pos.y() + (it.block->spec().shape == Shape::Hat ? blockview::Dome : 0);
+            p.drawLine(QPointF(it.pos.x() + it.width, rowTop + it.rowH / 2),
+                       QPointF(c->rect.left(), c->rect.top() + CommentHeader / 2));
+        }
+    }
+
+    // Commentaires, au-dessus des blocs
+    QFont f = font();
+    f.setPixelSize(12);
+    p.setFont(f);
+    for (const auto &c : comments_) {
+        const QRectF r = c->rect;
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 60));
+        p.drawRoundedRect(r.translated(2, 3), 6, 6);  // ombre
+        p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1));
+        p.setBrush(CommentColor);
+        p.drawRoundedRect(r, 6, 6);
+        p.setPen(Qt::NoPen);
+        p.setBrush(CommentHeaderColor);
+        QPainterPath header;
+        header.addRoundedRect(QRectF(r.left(), r.top(), r.width(), CommentHeader + 6), 6, 6);
+        p.drawPath(header.intersected([&] {
+            QPainterPath clip;
+            clip.addRect(QRectF(r.left(), r.top(), r.width(), CommentHeader));
+            return clip;
+        }()));
+        if (c.get() != editedComment_) {
+            p.setPen(QColor(0x57, 0x4D, 0x1E));
+            p.save();
+            const QRectF body = r.adjusted(6, CommentHeader + 2, -6, -4);
+            p.setClipRect(body);
+            p.drawText(body, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
+                       c->text.isEmpty() ? QStringLiteral("(clic pour écrire)") : c->text);
+            p.restore();
+        }
+        // Poignée de redimensionnement
+        p.setPen(QPen(QColor(0xB8, 0xA8, 0x45), 1.5));
+        for (qreal d = 4; d <= 10; d += 3)
+            p.drawLine(QPointF(r.right() - d, r.bottom() - 2), QPointF(r.right() - 2, r.bottom() - d));
+    }
+}
+
+QImage Canvas::renderImage(qreal scale) const
+{
+    // Scripts et commentaires sur fond blanc, sans sélection ni bloc en cours
+    QRectF r = blockview::bounds(items_);
+    for (const auto &c : comments_)
+        r |= c->rect.adjusted(0, 0, 2, 3);  // ombre
+    if (r.isNull())
+        return {};
+    r.adjust(-20, -20, 20, 20);
+    QImage image((r.size() * scale).toSize(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QPainter p(&image);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.scale(scale, scale);
+    p.translate(-r.topLeft());
+    for (const Item &it : items_)
+        blockview::paint(p, it);
+    paintComments(p);
+    return image;
 }

@@ -14,6 +14,7 @@ class Pairing;
 class Stage;
 class QComboBox;
 class QLabel;
+class QMenu;
 class QPushButton;
 
 class Window : public QWidget
@@ -65,6 +66,13 @@ private:
     void newProgram();
     void openExample(const QString &title, const QString &path);
     void openProgram();
+    void openRecent(const QString &path);
+    bool openFile(const QString &path);
+    void fillMoreMenu(QMenu *menu);
+    void addRecent(const QString &path);
+    void loadSettings();
+    void saveSettings() const;
+    bool exportImage();
     bool saveProgram();
     void setModified(bool on);
     void updateHistoryButtons();
@@ -84,6 +92,7 @@ private:
     Pairing *pairing_ = nullptr;
     bool modified_ = false;
     QString fileName_;
+    QStringList recentFiles_;  // chemins absolus, le plus récent d'abord
     QString untitled_ = QStringLiteral("sans titre");  // titre sans fichier (ex. un exemple)
     QTimer autosaveTimer_;
 

@@ -45,6 +45,8 @@ Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne p
 
 **Nouveau**, **Ouvrir…**, **Enregistrer…** (Ctrl+N / Ctrl+O / Ctrl+S) : les programmes sont des fichiers `.batmobile` (JSON).
 
+**Plus ▾** : **Fichiers récents** (les 8 derniers programmes ouverts ou enregistrés ; un fichier disparu est retiré de la liste) et **Exporter en image (PNG)…** (tous les scripts et commentaires sur fond blanc, en double résolution, pour imprimer ou partager).
+
 **Exemples ▾** : programmes tout faits, à ouvrir puis modifier (Enregistrer… en fait une copie) :
 
 | Exemple | Ce qu'il fait |

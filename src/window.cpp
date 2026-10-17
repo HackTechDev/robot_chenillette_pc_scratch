@@ -62,6 +62,15 @@ QString autosavePath()
         .filePath(QStringLiteral("autosave") + FileSuffix);
 }
 
+// ~/.local/share/batmobile_scratch/settings.json : fichiers récents
+QString settingsPath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath(QStringLiteral("settings.json"));
+}
+
+constexpr int MaxRecentFiles = 8;
+
 // ~/.local/share/batmobile_scratch/calibration.json
 QString calibrationPath()
 {
@@ -296,6 +305,13 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(openButton, &QPushButton::clicked, this, &Window::openProgram);
     QPushButton *saveButton = button(QStringLiteral("Enregistrer…"), QStringLiteral("small"));
     connect(saveButton, &QPushButton::clicked, this, &Window::saveProgram);
+    // Plus ▾ : fichiers récents, export en image (menu reconstruit à chaque ouverture)
+    QPushButton *more = button(QStringLiteral("Plus ▾"), QStringLiteral("small"));
+    connect(more, &QPushButton::clicked, this, [this, more] {
+        QMenu menu(this);
+        fillMoreMenu(&menu);
+        menu.exec(more->mapToGlobal(QPoint(0, -menu.sizeHint().height())));
+    });
     QPushButton *quit = button(QStringLiteral("✕"), QStringLiteral("quit"), QStringLiteral("Quitter"));
     quit->setFixedSize(32, 32);
     connect(quit, &QPushButton::clicked, this, &QWidget::close);  // confirmation dans closeEvent
@@ -313,6 +329,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     bottom->addWidget(newButton);
     bottom->addWidget(openButton);
     bottom->addWidget(saveButton);
+    bottom->addWidget(more);
     bottom->addSpacing(12);
     bottom->addWidget(quit);
 
@@ -360,6 +377,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     calibration_.load(calibrationPath());
     applyCalibration();
+    loadSettings();
 
     refreshDevices();
     restoreAutosave();
@@ -815,21 +833,123 @@ void Window::openProgram()
         return;
     const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Ouvrir un programme"),
                                                       QFileInfo(fileName_).path(), FileFilter);
-    if (path.isEmpty())
+    if (!path.isEmpty())
+        openFile(path);
+}
+
+void Window::openRecent(const QString &path)
+{
+    runner_.stop();
+    if (!QFileInfo::exists(path)) {
+        QMessageBox::information(this, QStringLiteral("Fichiers récents"),
+                                 QStringLiteral("%1 n'existe plus : retiré de la liste.").arg(path));
+        recentFiles_.removeAll(path);
+        saveSettings();
         return;
+    }
+    if (confirmDiscard())
+        openFile(path);
+}
+
+bool Window::openFile(const QString &path)
+{
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         QMessageBox::critical(this, QStringLiteral("Ouvrir"), file.errorString());
-        return;
+        return false;
     }
     if (!canvas_->load(QJsonDocument::fromJson(file.readAll()).object())) {
         QMessageBox::critical(this, QStringLiteral("Ouvrir"),
                               QStringLiteral("%1 n'est pas un programme BatMobile.").arg(QFileInfo(path).fileName()));
-        return;
+        return false;
     }
     programLoaded();
     fileName_ = path;
     setModified(false);
+    addRecent(path);
+    return true;
+}
+
+// --- Fichiers récents, export en image ---
+
+void Window::fillMoreMenu(QMenu *menu)
+{
+    QMenu *recent = menu->addMenu(QStringLiteral("Fichiers récents"));
+    for (const QString &path : std::as_const(recentFiles_)) {
+        QAction *a = recent->addAction(QFileInfo(path).fileName(), this, [this, path] { openRecent(path); });
+        a->setToolTip(path);
+        a->setStatusTip(path);
+    }
+    if (recentFiles_.isEmpty()) {
+        recent->addAction(QStringLiteral("(aucun)"))->setEnabled(false);
+    } else {
+        recent->addSeparator();
+        recent->addAction(QStringLiteral("Effacer la liste"), this, [this] {
+            recentFiles_.clear();
+            saveSettings();
+        });
+    }
+    recent->setToolTipsVisible(true);
+    menu->addSeparator();
+    menu->addAction(QStringLiteral("Exporter en image (PNG)…"), this, &Window::exportImage);
+}
+
+void Window::addRecent(const QString &path)
+{
+    const QString absolute = QFileInfo(path).absoluteFilePath();
+    recentFiles_.removeAll(absolute);
+    recentFiles_.prepend(absolute);
+    while (recentFiles_.size() > MaxRecentFiles)
+        recentFiles_.removeLast();
+    saveSettings();
+}
+
+void Window::loadSettings()
+{
+    QFile file(settingsPath());
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+    const QJsonObject o = QJsonDocument::fromJson(file.readAll()).object();
+    recentFiles_.clear();
+    for (const QJsonValue &v : o[QStringLiteral("recentFiles")].toArray()) {
+        if (recentFiles_.size() < MaxRecentFiles && !v.toString().isEmpty())
+            recentFiles_.append(v.toString());
+    }
+}
+
+void Window::saveSettings() const
+{
+    const QString path = settingsPath();
+    QDir().mkpath(QFileInfo(path).path());
+    QSaveFile file(path);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(QJsonDocument(QJsonObject{{QStringLiteral("recentFiles"), QJsonArray::fromStringList(recentFiles_)}})
+                       .toJson());
+        file.commit();
+    }
+}
+
+bool Window::exportImage()
+{
+    const QImage image = canvas_->renderImage();
+    if (image.isNull()) {
+        QMessageBox::information(this, QStringLiteral("Exporter"), QStringLiteral("Le programme est vide."));
+        return false;
+    }
+    const QString base = fileName_.isEmpty() ? QDir::home().filePath(QStringLiteral("programme"))
+                                             : QFileInfo(fileName_).path() + QLatin1Char('/') + QFileInfo(fileName_).completeBaseName();
+    QString path = QFileDialog::getSaveFileName(this, QStringLiteral("Exporter le programme en image"),
+                                                base + QStringLiteral(".png"), QStringLiteral("Image PNG (*.png)"));
+    if (path.isEmpty())
+        return false;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += QStringLiteral(".png");
+    if (!image.save(path, "PNG")) {
+        QMessageBox::critical(this, QStringLiteral("Exporter"), QStringLiteral("Impossible d'écrire %1.").arg(path));
+        return false;
+    }
+    status_->setText(QStringLiteral("Image enregistrée : %1").arg(path));
+    return true;
 }
 
 bool Window::saveProgram()
@@ -850,6 +970,7 @@ bool Window::saveProgram()
     fileName_ = path;
     canvas_->markSaved();
     setModified(false);
+    addRecent(path);
     return true;
 }
 

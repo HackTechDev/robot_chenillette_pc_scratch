@@ -2,6 +2,7 @@
 
 #include "blockview.h"
 
+#include <QImage>
 #include <QJsonObject>
 #include <QSet>
 #include <QTimer>
@@ -57,6 +58,9 @@ public:
     void paste();
     void deleteSelection();
     void selectAll();
+
+    // Image du programme (scripts et commentaires, fond blanc) ; vide s'il n'y a rien
+    QImage renderImage(qreal scale = 2) const;
 
     // Variables du programme (enregistrées avec lui, annulables)
     QStringList variables() const { return variables_; }
@@ -161,6 +165,7 @@ private:
     void editComment(Comment *c);
     void commitComment();
     void removeComment(int index);
+    void paintComments(QPainter &p) const;
     void duplicate(int item);
 
     std::vector<std::unique_ptr<Script>> scripts_;
