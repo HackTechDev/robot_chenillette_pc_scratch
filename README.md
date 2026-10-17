@@ -32,8 +32,9 @@ Dans la zone de programme :
 - clic sur un nombre : le modifier (virgule ou point ; durées au centième, ex. 0,25 s) ; **molette** sur un nombre : l'augmenter ou le diminuer (durées : 0,1 s par cran jusqu'à 2 s, puis 0,5 s ; nombres de tours et vitesse : 1 par cran) ;
 - clic sur un script : l'exécuter seul, comme dans Scratch ; **robot connecté, il faut un double-clic** (un clic involontaire ne fait pas bouger le robot) ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
-- clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent) ;
-- clic droit sur le fond : **Ajouter un commentaire**, **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (scripts et commentaires ; annulables avec ↶) ;
+- **sélection** : un clic sélectionne un bloc et ceux qui le suivent (halo bleu), **Ctrl+clic** en ajoute ou en retire, **Ctrl+A** sélectionne tous les scripts, un clic sur le fond désélectionne ; **Ctrl+C** / **Ctrl+X** / **Ctrl+V** copient, coupent et collent la sélection (y compris d'un programme à un autre : les variables suivent), le collage se fait sous la souris ; **Suppr** supprime la sélection (annulable avec ↶) ;
+- clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) **Copier** ou **Supprimer le bloc** (les suivants remontent) ;
+- clic droit sur le fond : **Ajouter un commentaire**, **Coller**, **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (scripts et commentaires ; annulables avec ↶) ;
 - **commentaires** (notes jaunes) : clic droit sur le fond ou sur un bloc → **Ajouter un commentaire** (à droite du bloc) ; clic sur la note pour écrire, clic ailleurs pour valider ; glisser la note pour la déplacer, son coin bas-droit pour la redimensionner ; clic droit → **Supprimer le commentaire**. Les notes sont enregistrées avec le programme et s'annulent avec ↶ ; elles ne sont pas rattachées aux blocs (elles ne suivent pas un script déplacé) ;
 - glisser le fond (ou bouton du milieu) : déplacer la vue ;
 - **zoom** de 50 à 200 % : Ctrl+molette (autour de la souris), boutons **− / 100 % / +** en bas, Ctrl++ / Ctrl+− / Ctrl+0.

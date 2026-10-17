@@ -1,6 +1,7 @@
 #include "canvas.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QContextMenuEvent>
 #include <QDragEnterEvent>
 #include <QMimeData>
@@ -42,6 +43,20 @@ const QColor CommentColor(0xFE, 0xF4, 0x9C);
 const QColor CommentHeaderColor(0xF2, 0xE4, 0x7A);
 const QPointF FirstScript(40, 40);
 const QString Format = QStringLiteral("batmobile-scratch");
+const QString ClipboardType = QStringLiteral("application/x-batmobile-scripts");
+const QPointF PasteOffset(24, 24);
+
+// Le bloc, ceux qui le suivent, et tout ce qu'ils contiennent
+void collectStack(const Block *b, QSet<const Block *> *out)
+{
+    for (; b; b = b->next.get()) {
+        out->insert(b);
+        for (const Input &in : b->inputs)
+            collectStack(in.reporter.get(), out);
+        collectStack(b->body.get(), out);
+        collectStack(b->body2.get(), out);
+    }
+}
 
 }  // namespace
 
@@ -68,6 +83,7 @@ void Canvas::clear()
     commitEdit();
     scripts_.clear();
     comments_.clear();
+    selection_.clear();
     addScript(FirstScript, std::make_unique<Block>(Kind::Start));
     setVariables({});
     relayout();
@@ -172,6 +188,7 @@ void Canvas::restore(const QJsonObject &o)
 {
     scripts_.clear();
     comments_.clear();
+    selection_.clear();
     for (const QJsonValue &v : o[QStringLiteral("comments")].toArray()) {
         const QJsonObject c = v.toObject();
         auto comment = std::make_unique<Comment>();
@@ -455,6 +472,18 @@ void Canvas::paintEvent(QPaintEvent *e)
             p.drawPoint(QPointF(x, y));
     }
 
+    // Sélection : halo bleu sous les blocs sélectionnés et ce qu'ils entraînent
+    QSet<const Block *> selected;
+    for (const Block *b : selectionRoots())
+        collectStack(b, &selected);
+    if (!selected.isEmpty()) {
+        p.setPen(QPen(QColor(0x66, 0xCC, 0xFF), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::NoBrush);
+        for (const Item &it : items_) {
+            if (selected.contains(it.block))
+                p.drawPath(it.path);
+        }
+    }
     for (const Item &it : items_)
         blockview::paint(p, it, it.block == current_, ghostBlocks_.contains(it.block));
     for (const Item &it : ghostItems_)
@@ -519,6 +548,18 @@ void Canvas::mousePressEvent(QMouseEvent *e)
             return;
         }
         pressItem_ = itemAt(pressPos_);
+        // Sélection : clic = ce bloc, Ctrl+clic = ajouter / retirer, fond = rien
+        const bool ctrl = e->modifiers() & Qt::ControlModifier;
+        if (pressItem_ < 0) {
+            if (!ctrl)
+                selection_.clear();
+        } else if (const quint64 id = items_[pressItem_].block->id; ctrl) {
+            if (!selection_.removeOne(id))
+                selection_.append(id);
+        } else if (!selection_.contains(id)) {
+            selection_ = {id};
+        }
+        update();
     }
     // Fond saisi (ou bouton du milieu) : déplacement de la vue
     if ((e->button() == Qt::LeftButton && pressItem_ < 0) || e->button() == Qt::MiddleButton) {
@@ -626,6 +667,8 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
         // Menu du fond
         QMenu menu(this);
         QAction *note = menu.addAction(QStringLiteral("Ajouter un commentaire"));
+        QAction *pasteAction = menu.addAction(QStringLiteral("Coller"));
+        pasteAction->setEnabled(QApplication::clipboard()->mimeData()->hasFormat(ClipboardType));
         menu.addSeparator();
         QAction *arrange = menu.addAction(QStringLiteral("Ranger les scripts"));
         QAction *all = menu.addAction(QStringLiteral("Tout supprimer"));
@@ -634,6 +677,8 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
         QAction *chosen = menu.exec(e->globalPos());
         if (chosen == note)
             addComment(m);
+        else if (chosen == pasteAction)
+            paste();
         else if (chosen == arrange)
             arrangeScripts();
         else if (chosen == all)
@@ -642,10 +687,15 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
     }
     QMenu menu(this);
     QAction *dup = menu.addAction(QStringLiteral("Dupliquer"));
+    QAction *copy = menu.addAction(QStringLiteral("Copier"));
     QAction *del = menu.addAction(QStringLiteral("Supprimer le bloc"));
     QAction *note = menu.addAction(QStringLiteral("Ajouter un commentaire"));
     QAction *chosen = menu.exec(e->globalPos());
-    if (chosen == dup)
+    if (chosen == copy) {
+        if (!selection_.contains(items_[i].block->id))
+            selection_ = {items_[i].block->id};
+        copySelection();
+    } else if (chosen == dup)
         duplicate(i);
     else if (chosen == del)
         removeBlock(i);
@@ -1085,4 +1135,130 @@ bool Canvas::eventFilter(QObject *o, QEvent *e)
     if (o == noteEditor_ && e->type() == QEvent::FocusOut)
         commitComment();
     return QWidget::eventFilter(o, e);
+}
+
+// --- Sélection et presse-papiers ---
+
+int Canvas::itemOf(quint64 id) const
+{
+    for (int i = 0; i < items_.size(); ++i) {
+        if (items_[i].block->id == id)
+            return i;
+    }
+    return -1;
+}
+
+QList<const Block *> Canvas::selectionRoots() const
+{
+    QList<const Block *> roots;
+    for (const quint64 id : selection_) {
+        if (const int i = itemOf(id); i >= 0)
+            roots.append(items_[i].block);
+    }
+    // Un bloc déjà entraîné par un autre bloc sélectionné n'est pas compté deux fois
+    QList<const Block *> out;
+    for (const Block *b : roots) {
+        const bool inside = std::any_of(roots.cbegin(), roots.cend(), [b](const Block *other) {
+            if (other == b)
+                return false;
+            QSet<const Block *> stack;
+            collectStack(other, &stack);
+            return stack.contains(b);
+        });
+        if (!inside)
+            out.append(b);
+    }
+    return out;
+}
+
+void Canvas::copySelection()
+{
+    commitEdit();
+    const QList<const Block *> roots = selectionRoots();
+    if (roots.isEmpty())
+        return;
+    // Positions relatives au coin haut gauche de la sélection
+    QPointF origin(1e9, 1e9);
+    for (const Block *b : roots) {
+        const QPointF pos = items_[itemOf(b->id)].pos;
+        origin = QPointF(qMin(origin.x(), pos.x()), qMin(origin.y(), pos.y()));
+    }
+    QJsonArray scripts;
+    for (const Block *b : roots) {
+        const QPointF pos = items_[itemOf(b->id)].pos - origin;
+        // Le bloc et ceux qui le suivent (comme Dupliquer)
+        scripts.append(QJsonObject{
+            {QStringLiteral("x"), pos.x()},
+            {QStringLiteral("y"), pos.y()},
+            {QStringLiteral("blocks"), blocksToJson(b)},
+        });
+    }
+    auto *mime = new QMimeData;
+    mime->setData(ClipboardType, QJsonDocument(QJsonObject{{QStringLiteral("scripts"), scripts}}).toJson());
+    QApplication::clipboard()->setMimeData(mime);
+}
+
+void Canvas::paste()
+{
+    const QMimeData *mime = QApplication::clipboard()->mimeData();
+    if (running_ || !mime || !mime->hasFormat(ClipboardType))
+        return;
+    commitEdit();
+    // Sous la souris si elle est sur la zone visible, sinon près du centre de la vue
+    const QPointF mouse = mapFromGlobal(QCursor::pos());
+    const QPointF target = visibleRegion().contains(mouse.toPoint()) ? toModel(mouse)
+                                                                       : toModel(viewCenter()) - QPointF(100, 60);
+    selection_.clear();
+    const QJsonArray scripts = QJsonDocument::fromJson(mime->data(ClipboardType)).object()[QStringLiteral("scripts")].toArray();
+    for (const QJsonValue &v : scripts) {
+        const QJsonObject s = v.toObject();
+        if (BlockPtr top = blocksFromJson(s[QStringLiteral("blocks")].toArray())) {
+            selection_.append(top->id);  // les blocs collés restent sélectionnés
+            addScript(target + QPointF(s[QStringLiteral("x")].toDouble(), s[QStringLiteral("y")].toDouble()),
+                      std::move(top));
+        }
+    }
+    setVariables(variables_);  // variables utilisées par les blocs collés
+    relayout();
+    edited();
+}
+
+void Canvas::deleteSelection()
+{
+    if (running_)
+        return;
+    commitEdit();
+    bool removed = false;
+    for (const Block *b : selectionRoots()) {
+        const int i = itemOf(b->id);
+        if (i < 0)
+            continue;
+        BlockPtr gone = std::move(*items_[i].slot);  // le bloc et ceux qui le suivent
+        removed = true;
+        relayout();  // les slots des blocs restants restent valides, les Item sont recalculés
+    }
+    selection_.clear();
+    if (!removed)
+        return update();
+    pruneScripts();
+    relayout();
+    edited();
+}
+
+void Canvas::cutSelection()
+{
+    if (running_)
+        return;
+    copySelection();
+    deleteSelection();
+}
+
+void Canvas::selectAll()
+{
+    selection_.clear();
+    for (const auto &s : scripts_) {
+        if (s->top)
+            selection_.append(s->top->id);
+    }
+    update();
 }

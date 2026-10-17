@@ -96,6 +96,7 @@ struct Block {
     const Spec &spec() const { return specOf(kind); }
 
     Kind kind;
+    quint64 id;  // unique pendant la session (pas enregistré) : sélection, commentaires
     std::array<Input, 2> inputs;
     QString name;        // variable, bloc personnalisé ou paramètre
     QStringList params;  // mes blocs (définir / appel) : noms des paramètres

@@ -50,6 +50,13 @@ public:
     void removeAll();       // scripts et commentaires
     void addComment(const QPointF &pos, const QString &text = {});  // pos : coordonnées du programme
 
+    // Sélection (un bloc et ceux qui le suivent) et presse-papiers
+    void copySelection();
+    void cutSelection();
+    void paste();
+    void deleteSelection();
+    void selectAll();
+
     // Variables du programme (enregistrées avec lui, annulables)
     QStringList variables() const { return variables_; }
     bool addVariable(const QString &name);  // false si le nom existe déjà
@@ -143,6 +150,8 @@ private:
     void updateProcedures();
     void commitEdit();
     void removeBlock(int item);
+    int itemOf(quint64 id) const;  // -1 si le bloc n'est plus dans le programme
+    QList<const Block *> selectionRoots() const;  // sans ceux contenus dans un autre bloc sélectionné
     int commentAt(const QPointF &pos) const;  // le plus haut (dessiné en dernier), ou -1
     void editComment(Comment *c);
     void commitComment();
@@ -180,6 +189,7 @@ private:
     QRectF commentStart_;     // rectangle au moment de l'appui
     QPlainTextEdit *noteEditor_;
     Comment *editedComment_ = nullptr;
+    QList<quint64> selection_;  // ids des blocs sélectionnés
     QList<QJsonObject> history_;
     int historyIndex_ = 0;
     QJsonObject saved_;

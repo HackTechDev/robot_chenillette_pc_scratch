@@ -326,6 +326,12 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(new QShortcut(QKeySequence::Open, this), &QShortcut::activated, this, &Window::openProgram);
     connect(new QShortcut(QKeySequence::Save, this), &QShortcut::activated, this, &Window::saveProgram);
     connect(new QShortcut(QKeySequence::Undo, this), &QShortcut::activated, canvas_, &Canvas::undo);
+    // Presse-papiers : une zone de saisie qui a le focus garde ces raccourcis pour son texte
+    connect(new QShortcut(QKeySequence::Copy, this), &QShortcut::activated, canvas_, &Canvas::copySelection);
+    connect(new QShortcut(QKeySequence::Cut, this), &QShortcut::activated, canvas_, &Canvas::cutSelection);
+    connect(new QShortcut(QKeySequence::Paste, this), &QShortcut::activated, canvas_, &Canvas::paste);
+    connect(new QShortcut(QKeySequence::Delete, this), &QShortcut::activated, canvas_, &Canvas::deleteSelection);
+    connect(new QShortcut(QKeySequence::SelectAll, this), &QShortcut::activated, canvas_, &Canvas::selectAll);
     connect(new QShortcut(QKeySequence::Redo, this), &QShortcut::activated, canvas_, &Canvas::redo);
     connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, canvas_, &Canvas::zoomIn);
     connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this), &QShortcut::activated, canvas_,

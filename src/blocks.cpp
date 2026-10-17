@@ -170,6 +170,8 @@ const QList<Category> &categories()
 
 Block::Block(Kind k) : kind(k)
 {
+    static quint64 nextId = 0;
+    id = ++nextId;
     inputs[0].value = specOf(k).def;
     inputs[1].value = specOf(k).def2;
     if (hasText(specOf(k)))
