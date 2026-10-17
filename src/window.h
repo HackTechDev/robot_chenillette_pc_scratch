@@ -16,6 +16,7 @@ class QComboBox;
 class QLabel;
 class QMenu;
 class QPushButton;
+class QVBoxLayout;
 
 class Window : public QWidget
 {
@@ -73,6 +74,8 @@ private:
     void loadSettings();
     void saveSettings() const;
     bool exportImage();
+    void detachStage();  // scène dans une fenêtre séparée
+    void attachStage();  // de retour dans la fenêtre principale
     bool saveProgram();
     void setModified(bool on);
     void updateHistoryButtons();
@@ -106,4 +109,9 @@ private:
     Palette *palette_;
     Canvas *canvas_;
     Stage *stage_;
+    QVBoxLayout *stageCol_;
+    QLabel *stagePlaceholder_;
+    QPushButton *stageWindowButton_;
+    QWidget *stageWindow_ = nullptr;
+    QByteArray stageGeometry_;  // position et taille de la fenêtre de la scène
 };

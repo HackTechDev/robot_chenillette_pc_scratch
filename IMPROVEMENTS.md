@@ -32,7 +32,7 @@ Murs, balle à attraper, zone d'arrivée, posés à la souris sur le terrain (en
 
 ### 27. Mode présentation
 
-Scène en plein écran et blocs agrandis, pour le vidéoprojecteur.
+Pour le vidéoprojecteur : la scène peut déjà s'afficher dans une fenêtre séparée et en plein écran (⧉ Fenêtre, F11). Reste un mode « grands blocs » (zoom et palette agrandis, interface simplifiée) d'un seul geste.
 
 ## Robot
 

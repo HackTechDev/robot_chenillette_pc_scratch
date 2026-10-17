@@ -65,6 +65,8 @@ Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibr�
 
 À droite, le robot vu de dessus suit les commandes du programme, robot connecté ou non : déplacements avec la trace du parcours, ouverture de la pince, jauge de la hauteur de la tête. Pendant un bloc « ouvrir / fermer la pince », une **loupe** en bas à gauche montre la pince en grand qui s'ouvre ou se ferme (« s'ouvre… », « se ferme… », puis « ouverte », « fermée » ou « ouverte à N % ») ; elle s'efface une seconde après. **⟲ Replacer** le remet au centre et efface la trace. Il bute sur les bords de la scène.
 
+**⧉ Fenêtre** place la scène dans une fenêtre séparée, redimensionnable (par exemple sur un second écran ou le vidéoprojecteur) ; **F11** l'y met en plein écran. Dans cette fenêtre, **Échap** arrête le programme (et quitte le plein écran), **F5** / **F10** lancent ou avancent pas à pas, et les touches des scripts « quand la touche … » fonctionnent. Fermer la fenêtre (ou **⧉ Rattacher**) remet la scène à sa place ; l'appli se souvient de ce choix et de la position de la fenêtre au lancement suivant.
+
 Le terrain mesure **160 × 120 cm** (carreaux de 10 cm) et le robot y est dessiné à l'échelle (~12 cm). La scène utilise le **calibrage** : vitesse en cm/s, démarrage progressif en ligne droite (comme le firmware, qui accélère sur ~0,4 s à la vitesse 200), pivots en °/s. Sans calibrage, valeurs par défaut : 20 cm/s et 180°/s à la vitesse 4.
 
 ## Calibrage

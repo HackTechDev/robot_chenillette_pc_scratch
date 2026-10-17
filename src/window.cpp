@@ -245,14 +245,26 @@ Window::Window(QWidget *parent) : QWidget(parent)
     QPushButton *calibrate = button(QStringLiteral("⚙ Calibrer…"), QStringLiteral("small"),
                                     QStringLiteral("Mesurer les distances et les angles du vrai robot"));
     connect(calibrate, &QPushButton::clicked, this, &Window::openCalibration);
+    stageWindowButton_ = button(QStringLiteral("⧉ Fenêtre"), QStringLiteral("small"),
+                                QStringLiteral("Scène dans une fenêtre séparée, redimensionnable (F11 : plein écran)"));
+    connect(stageWindowButton_, &QPushButton::clicked, this, [this] { stageWindow_ ? attachStage() : detachStage(); });
     auto *stageButtons = new QHBoxLayout;
     stageButtons->addWidget(replace);
     stageButtons->addWidget(calibrate);
+    stageButtons->addWidget(stageWindowButton_);
     stageButtons->addStretch();
-    auto *stageCol = new QVBoxLayout;
+    stagePlaceholder_ = label(QStringLiteral("La scène est dans une fenêtre séparée : la fermer (ou ⧉ Rattacher) "
+                                             "la remet ici."),
+                              QStringLiteral("hint"));
+    stagePlaceholder_->setWordWrap(true);
+    stagePlaceholder_->setFixedWidth(360);
+    stagePlaceholder_->hide();
+    stageCol_ = new QVBoxLayout;
+    auto *stageCol = stageCol_;
     stageCol->setContentsMargins(12, 0, 0, 0);
     stageCol->addWidget(label(QStringLiteral("Scène (simulation)"), QStringLiteral("section")));
     stageCol->addWidget(stage_);
+    stageCol->addWidget(stagePlaceholder_);
     stageCol->addLayout(stageButtons);
     QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. Terrain de "
                                              "160 × 120 cm ; distances et angles d'après le calibrage."),
@@ -521,7 +533,14 @@ void Window::setConnected(bool on)
 
 bool Window::eventFilter(QObject *o, QEvent *e)
 {
-    if (e->type() != QEvent::KeyPress || QApplication::activeWindow() != this || QApplication::activePopupWidget()
+    if (o == stageWindow_ && e->type() == QEvent::Close) {
+        // Fermer la fenêtre de la scène la remet dans la fenêtre principale
+        QMetaObject::invokeMethod(this, &Window::attachStage, Qt::QueuedConnection);
+        return false;
+    }
+    const QWidget *active = QApplication::activeWindow();
+    if (e->type() != QEvent::KeyPress || !(active == this || (stageWindow_ && active == stageWindow_))
+        || QApplication::activePopupWidget()
         || qobject_cast<QLineEdit *>(QApplication::focusWidget())
         || qobject_cast<QPlainTextEdit *>(QApplication::focusWidget()))  // saisie d'un nombre ou d'un commentaire
         return QWidget::eventFilter(o, e);
@@ -915,6 +934,10 @@ void Window::loadSettings()
         if (recentFiles_.size() < MaxRecentFiles && !v.toString().isEmpty())
             recentFiles_.append(v.toString());
     }
+    const QJsonObject stage = o[QStringLiteral("stageWindow")].toObject();
+    stageGeometry_ = QByteArray::fromBase64(stage[QStringLiteral("geometry")].toString().toLatin1());
+    if (stage[QStringLiteral("detached")].toBool())  // après l'affichage de la fenêtre principale
+        QMetaObject::invokeMethod(this, &Window::detachStage, Qt::QueuedConnection);
 }
 
 void Window::saveSettings() const
@@ -923,10 +946,74 @@ void Window::saveSettings() const
     QDir().mkpath(QFileInfo(path).path());
     QSaveFile file(path);
     if (file.open(QIODevice::WriteOnly)) {
-        file.write(QJsonDocument(QJsonObject{{QStringLiteral("recentFiles"), QJsonArray::fromStringList(recentFiles_)}})
+        const QByteArray geometry = stageWindow_ ? stageWindow_->saveGeometry() : stageGeometry_;
+        const QJsonObject stage{
+            {QStringLiteral("detached"), stageWindow_ != nullptr},
+            {QStringLiteral("geometry"), QString::fromLatin1(geometry.toBase64())},
+        };
+        file.write(QJsonDocument(QJsonObject{
+                                     {QStringLiteral("recentFiles"), QJsonArray::fromStringList(recentFiles_)},
+                                     {QStringLiteral("stageWindow"), stage},
+                                 })
                        .toJson());
         file.commit();
     }
+}
+
+// --- Scène dans une fenêtre séparée ---
+
+void Window::detachStage()
+{
+    if (stageWindow_)
+        return;
+    stageWindow_ = new QWidget(this, Qt::Window);  // fenêtre à part, fermée avec l'appli
+    stageWindow_->setWindowTitle(QStringLiteral("%1 — Scène").arg(RobotName));
+    stageWindow_->setStyleSheet(QStringLiteral("background: #111;"));
+    stageWindow_->installEventFilter(this);
+    auto *layout = new QVBoxLayout(stageWindow_);
+    layout->setContentsMargins(0, 0, 0, 0);
+    stageCol_->removeWidget(stage_);
+    stage_->setMinimumSize(240, 180);
+    stage_->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+    layout->addWidget(stage_);
+    stagePlaceholder_->show();
+    stageWindowButton_->setText(QStringLiteral("⧉ Rattacher"));
+
+    // Raccourcis utiles quand cette fenêtre a le focus (Échap arrête toujours le robot)
+    auto shortcut = [this](const QKeySequence &key, auto slot) {
+        connect(new QShortcut(key, stageWindow_), &QShortcut::activated, this, slot);
+    };
+    shortcut(QKeySequence(Qt::Key_Escape), [this] {
+        runner_.stop();
+        if (stageWindow_->isFullScreen())
+            stageWindow_->showNormal();
+    });
+    shortcut(QKeySequence(Qt::Key_F5), [this] { runOrContinue(false); });
+    shortcut(QKeySequence(Qt::Key_F10), [this] { runOrContinue(true); });
+    shortcut(QKeySequence(Qt::Key_F11), [this] {
+        stageWindow_->isFullScreen() ? stageWindow_->showNormal() : stageWindow_->showFullScreen();
+    });
+
+    if (stageGeometry_.isEmpty() || !stageWindow_->restoreGeometry(stageGeometry_))
+        stageWindow_->resize(800, 600);
+    stageWindow_->show();
+    saveSettings();
+}
+
+void Window::attachStage()
+{
+    if (!stageWindow_)
+        return;
+    QWidget *window = std::exchange(stageWindow_, nullptr);
+    stageGeometry_ = window->saveGeometry();
+    window->removeEventFilter(this);
+    stage_->setFixedSize(360, 270);
+    stageCol_->insertWidget(stageCol_->indexOf(stagePlaceholder_), stage_);
+    stagePlaceholder_->hide();
+    stageWindowButton_->setText(QStringLiteral("⧉ Fenêtre"));
+    window->hide();
+    window->deleteLater();
+    saveSettings();
 }
 
 bool Window::exportImage()
@@ -1009,6 +1096,7 @@ void Window::closeEvent(QCloseEvent *e)
         return;
     }
     autosave();
+    saveSettings();  // scène détachée ou non, et position de sa fenêtre
     delete pairing_;  // annule un appairage en cours
     pairing_ = nullptr;
     link_.disconnectFromRobot();  // envoie un stop avant de fermer
