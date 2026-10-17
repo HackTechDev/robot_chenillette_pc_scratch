@@ -39,12 +39,14 @@ enum class Kind {
     If, IfElse, RepeatUntil,
     Less, Equal, Greater, And, Or, Not,
     ParamValue,  // mes blocs : valeur d'un paramètre, dans la définition
+    Say, SayFor,  // bulle au-dessus du robot dans la scène
 };
 
 struct Spec {
     Kind kind;
     const char *id;    // nom dans les fichiers .batmobile
-    // %1, %2 = entrées ; %v = liste des variables ; %n = nom (variable, bloc personnalisé) en texte
+    // %1, %2 = entrées ; %v = liste des variables ; %n = nom (variable, bloc personnalisé) en texte ;
+    // %t = texte libre (Block::text) ou n'importe quel reporter (dans inputs[TextInput])
     const char *text;
     QRgb color;
     Shape shape;
@@ -60,6 +62,8 @@ inline bool hasElse(Shape s) { return s == Shape::E; }
 inline bool isReporter(Shape s) { return s == Shape::Reporter || s == Shape::Boolean; }
 int inputCount(const Spec &s);
 inline constexpr int MaxParams = 2;  // paramètres d'un bloc personnalisé (= entrées d'un bloc)
+inline constexpr int TextInput = 1;  // entrée qui reçoit le reporter d'un texte %t
+bool hasText(const Spec &s);
 // Une entrée de ce type accepte ce reporter : nombre ← arrondi, condition ← hexagone (pas la touche)
 inline bool acceptsShape(Param p, Shape s)
 {
@@ -95,6 +99,7 @@ struct Block {
     std::array<Input, 2> inputs;
     QString name;        // variable, bloc personnalisé ou paramètre
     QStringList params;  // mes blocs (définir / appel) : noms des paramètres
+    QString text;        // texte libre (%t)
     BlockPtr next;
     BlockPtr body;
     BlockPtr body2;  // « sinon »

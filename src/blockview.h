@@ -44,6 +44,7 @@ struct Item {
     QList<Text> texts;
     std::array<QRectF, 2> value;  // pastille de chaque entrée sans reporter (vide sinon)
     QRectF var;                   // liste des variables (vide s'il n'y en a pas)
+    QRectF textField;             // texte libre %t sans reporter (vide sinon)
 
     int valueAt(const QPointF &p) const;  // entrée dont la pastille contient p, ou -1
 };

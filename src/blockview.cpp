@@ -190,7 +190,7 @@ QStringList tokens(const Block *b)
         return out;
     }
     const Spec &s = b->spec();
-    static const QRegularExpression re(QStringLiteral("(%[12vn])"));
+    static const QRegularExpression re(QStringLiteral("(%[12vnt])"));
     QStringList out;
     const QString text = QString::fromUtf8(s.text);
     qsizetype last = 0;
@@ -252,6 +252,19 @@ qreal placeTokens(const Block *b, const QFontMetricsF &fm, qreal left, qreal row
                 const qreal w = qMax(PillMinW, fm.horizontalAdvance(formatValue(s.param, b->inputs[i].value)) + 16);
                 if (it)
                     it->value[i] = QRectF(x, rowTop + (rowH - PillH) / 2, w, PillH);
+                x += w;
+            }
+        } else if (t == QLatin1String("%t")) {
+            // Texte libre, ou le reporter qui le remplace
+            if (const Block *r = b->inputs[TextInput].reporter.get()) {
+                const QSizeF size = measure(r, fm);
+                if (childPos)
+                    (*childPos)[TextInput] = QPointF(x, rowTop + (rowH - size.height()) / 2);
+                x += size.width();
+            } else {
+                const qreal w = qMax(PillMinW, fm.horizontalAdvance(b->text) + 16);
+                if (it)
+                    it->textField = QRectF(x, rowTop + (rowH - PillH) / 2, w, PillH);
                 x += w;
             }
         } else if (t == QLatin1String("%v")) {
@@ -409,6 +422,13 @@ void paint(QPainter &p, const Item &item, bool highlight, bool ghost)
         p.drawRoundedRect(item.value[i], PillH / 2, PillH / 2);
         p.setPen(QColor(0x57, 0x5E, 0x75));
         p.drawText(item.value[i], Qt::AlignCenter, formatValue(s.param, b->inputs[i].value));
+    }
+    if (!item.textField.isNull()) {
+        p.setPen(QPen(border, 1));
+        p.setBrush(Qt::white);
+        p.drawRoundedRect(item.textField, 6, 6);
+        p.setPen(QColor(0x57, 0x5E, 0x75));
+        p.drawText(item.textField, Qt::AlignCenter, b->text);
     }
     if (!item.var.isNull()) {
         // Liste des variables : pastille foncée, comme dans Scratch

@@ -88,6 +88,7 @@ Quelques vitesses suffisent (par exemple 2, 4 et 6) : les autres sont interpolé
 | démarrer avancer / reculer / pivoter ↺ / ↻ | `z` / `s` / `q` / `d`, sans attente : le robot continue jusqu'au prochain stop ou mouvement |
 | vitesse N (0 à 9) | chiffre `N` → vitesse `(N + 1) × 40` |
 | stop | espace |
+| dire [texte] / dire [texte] pendant N s | bulle au-dessus du robot dans la scène (rien n'est envoyé au robot) |
 | attendre N s | rien |
 | répéter N fois { … } | boucle |
 | répéter indéfiniment { … } | boucle sans fin (jusqu'à ■) ; aucun bloc ne peut la suivre |
@@ -101,6 +102,8 @@ Quelques vitesses suffisent (par exemple 2, 4 et 6) : les autres sont interpolé
 Chaque exécution commence par remettre la vitesse par défaut (`4` → 200), sauf celle d'un script de touche.
 
 **Variables et opérateurs** : **Créer une variable** (section Variables de la palette) ajoute un reporter à son nom, et les blocs « mettre … à » / « ajouter … à ». Les reporters (variables et opérateurs verts) se glissent dans une entrée — durée, nombre de tours, vitesse, ou entrée d'un autre opérateur — pour calculer une valeur pendant l'exécution, par exemple une spirale : « répéter 10 fois : ajouter 0,1 à durée, avancer pendant (durée) s, pivoter ↻ 0,5 s ». Le nom de variable se choisit dans la liste ▾ du bloc. Les valeurs calculées sont bornées à l'usage (durée 0–60 s, vitesse 0–9…) ; une division par zéro donne 0 ; un nombre aléatoire entre deux entiers est entier. Les variables gardent leur valeur d'une exécution à l'autre (comme dans Scratch) et s'affichent en haut à gauche de la scène. Un clic sur un reporter seul affiche sa valeur. Clic droit sur une variable de la palette : la supprimer (si aucun bloc ne l'utilise).
+
+**Dire** : les blocs **dire [Bonjour !]** et **dire [Bonjour !] pendant 2 s** (catégorie Apparence) affichent une bulle au-dessus du robot dans la scène. Clic sur le texte pour le changer (40 caractères au plus), ou glisser un reporter dans la case pour afficher une valeur (variable, calcul, ⟨condition⟩ → vrai / faux). La bulle de « dire » reste jusqu'au « dire » suivant ; celle de « dire … pendant » s'efface à la fin de la durée ; ■ et une nouvelle exécution les effacent.
 
 **Conditions** : les blocs hexagonaux (vert, catégorie Opérateurs) donnent vrai ou faux et ne se placent que dans une case de condition (hexagone en creux) : celle de « si », « répéter jusqu'à », « et », « ou », « non ». Les comparaisons acceptent des nombres ou des reporters, par exemple ⟨(distance) > 100⟩. Une case de condition vide vaut faux. Un clic sur une condition seule affiche « vrai » ou « faux ».
 

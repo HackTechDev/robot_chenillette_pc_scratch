@@ -51,6 +51,7 @@ signals:
     void paused(const Block *next);    // pas à pas : en attente avant ce bloc
     void variableChanged(const QString &name, double value);
     void error(const QString &message);  // programme arrêté (ex. appels sans fin)
+    void said(const QString &text);      // bulle « dire » (vide : effacée)
     void finished();
 
 private:
@@ -66,6 +67,7 @@ private:
 
     double input(const Block *b, int i);  // valeur d'une entrée (nombre ou reporter)
     bool condition(const Block *b, int i);  // entrée de condition : vide = faux
+    QString sayText(const Block *b);
     double input(const Block *b, int i, Param p) { return clampValue(p, input(b, i)); }
     void setVariable(const QString &name, double value);
     void send(char cmd);
@@ -85,6 +87,7 @@ private:
     quint64 waits_ = 0;  // nombre d'attentes depuis le début
     bool moving_ = false;  // commande envoyée, stop à envoyer à la fin de l'attente
     bool rolling_ = false; // « démarrer … » envoyé : le robot bouge jusqu'au prochain stop
+    bool saying_ = false;  // « dire … pendant » : bulle à effacer à la fin de l'attente
     bool running_ = false;
     bool stepByStep_ = false;
     bool paused_ = false;

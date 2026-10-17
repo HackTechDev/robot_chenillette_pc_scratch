@@ -29,6 +29,7 @@ void Runner::start(const Block *first, bool stepByStep, bool resetSpeed)
     running_ = true;
     stepByStep_ = stepByStep;
     acted_ = true;  // pas à pas : arrêt avant le premier bloc d'action
+    emit said(QString());  // bulle de l'exécution précédente
     frames_ = {{first, nullptr, 0, waits_}};
     if (resetSpeed)
         send(char('0' + SpeedLevelDefault));  // chaque exécution part de la vitesse par défaut
@@ -53,6 +54,8 @@ void Runner::stop()
     timer_.stop();
     frames_.clear();
     moving_ = false;
+    saying_ = false;
+    emit said(QString());
     send(Stop);
     finish();
 }
@@ -101,6 +104,17 @@ double Runner::argument(const QString &name) const
             return frames_[i].args.value(name);
     }
     return 0;  // hors d'un appel (clic sur le reporter seul)
+}
+
+QString Runner::sayText(const Block *b)
+{
+    const Block *r = b->inputs[TextInput].reporter.get();
+    if (!r)
+        return b->text;
+    const double v = evaluate(r);
+    if (r->spec().shape == Shape::Boolean)
+        return v != 0 ? QStringLiteral("vrai") : QStringLiteral("faux");
+    return formatNumber(v);
 }
 
 bool Runner::condition(const Block *b, int i)
@@ -152,6 +166,10 @@ void Runner::onTimeout()
     if (moving_) {
         moving_ = false;
         send(Stop);
+    }
+    if (saying_) {
+        saying_ = false;
+        emit said(QString());
     }
     step();
 }
@@ -250,6 +268,13 @@ void Runner::step()
             send(Stop);
             break;
         case Kind::Wait:
+            return wait(input(b, 0, Param::Seconds));
+        case Kind::Say:
+            emit said(sayText(b));
+            break;
+        case Kind::SayFor:
+            emit said(sayText(b));
+            saying_ = true;
             return wait(input(b, 0, Param::Seconds));
         case Kind::SetVar:
             setVariable(b->name, input(b, 0));

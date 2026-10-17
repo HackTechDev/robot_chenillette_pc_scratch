@@ -32,6 +32,8 @@ constexpr qreal ZoomStep = 1.25;
 constexpr int WheelNotch = 120;
 constexpr int WheelCommitMs = 600;
 constexpr qreal ArrangeGap = 24;
+constexpr int EditText = -1;      // editedInput_ : saisie du texte libre %t
+constexpr int MaxTextLength = 40;
 const QSizeF CommentSize(200, 110);
 const QSizeF CommentMin(90, 50);
 constexpr qreal CommentHeader = 18;  // bandeau du haut (on saisit la note par là ou ailleurs)
@@ -383,6 +385,12 @@ Canvas::Snap Canvas::findSnap(BlockPtr &stack, const QPointF &topLeft) const
                              topLeft + QPointF(0, h / 2));
             }
         }
+        // Texte libre : accepte tous les reporters
+        for (const Item &it : items_) {
+            if (!it.textField.isNull())
+                consider(&it.block->inputs[TextInput].reporter, nullptr,
+                         QPointF(it.textField.left(), it.textField.center().y()), topLeft + QPointF(0, h / 2));
+        }
         return best;
     }
     // Une boucle sans fin en bas de la pile : rien ne peut la suivre
@@ -578,6 +586,8 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
     const QPointF m = toModel(e->position());
     if (const int input = items_[i].valueAt(m); input >= 0 && items_[i].block->spec().param != Param::Bool)
         return editValue(i, input);
+    if (!items_[i].textField.isNull() && items_[i].textField.contains(m))
+        return editValue(i, EditText);
     if (!items_[i].var.isNull() && items_[i].var.contains(m))
         return chooseVariable(i);
     if (!running_)
@@ -590,7 +600,8 @@ void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
     const int i = commentAt(m) >= 0 ? -1 : itemAt(m);
     if (e->button() != Qt::LeftButton || i < 0 || running_
         || (items_[i].valueAt(m) >= 0 && items_[i].block->spec().param != Param::Bool)
-        || (!items_[i].var.isNull() && items_[i].var.contains(m)))
+        || (!items_[i].var.isNull() && items_[i].var.contains(m))
+        || (!items_[i].textField.isNull() && items_[i].textField.contains(m)))
         return mousePressEvent(e);
     pressItem_ = -1;  // le relâchement qui suit n'est pas un second clic
     emit scriptDoubleClicked(itemScripts_[i]->top.get());
@@ -770,15 +781,21 @@ void Canvas::editValue(int item, int input)
     edited_ = it.block;
     editedInput_ = input;
     delete editor_->validator();
-    editor_->setValidator(new QRegularExpressionValidator(QRegularExpression(valuePattern(param)), editor_));
-    editor_->setText(formatValue(param, it.block->inputs[input].value));
+    if (input == EditText) {
+        editor_->setMaxLength(MaxTextLength);
+        editor_->setText(it.block->text);
+    } else {
+        editor_->setMaxLength(32767);
+        editor_->setValidator(new QRegularExpressionValidator(QRegularExpression(valuePattern(param)), editor_));
+        editor_->setText(formatValue(param, it.block->inputs[input].value));
+    }
     editor_->setStyleSheet(QStringLiteral("QLineEdit { background: #fff; color: #222; border: 2px solid #4C97FF;"
                                           " border-radius: %1px; font-weight: bold; font-size: %2px; }")
                                .arg(qRound(12 * zoom_))
                                .arg(qRound(13 * zoom_)));
-    const QRectF pill = it.value[input];
+    const QRectF pill = input == EditText ? it.textField : it.value[input];
     QRect r = QRectF(pill.topLeft() * zoom_, pill.size() * zoom_).toAlignedRect().adjusted(-4, -2, 4, 2);
-    r.setWidth(qMax(r.width(), qRound(56 * zoom_)));
+    r.setWidth(qMax(r.width(), qRound((input == EditText ? 160 : 56) * zoom_)));
     editor_->setGeometry(r);
     editor_->show();
     editor_->setFocus();
@@ -846,6 +863,13 @@ void Canvas::commitEdit()
         return;
     Block *b = std::exchange(edited_, nullptr);
     editor_->hide();  // déclenche editingFinished : edited_ est déjà remis à zéro
+    if (editedInput_ == EditText) {
+        if (editor_->text() != b->text) {
+            b->text = editor_->text();
+            edited();
+        }
+        return relayout();
+    }
     double v = 0;
     double &value = b->inputs[editedInput_].value;
     if (parseValue(b->spec().param, editor_->text(), &v) && v != value) {

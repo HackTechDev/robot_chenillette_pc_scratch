@@ -21,6 +21,7 @@ public:
 
     void command(char cmd);  // même protocole que le robot
     void setCalibration(const Calibration &c) { calibration_ = c; }
+    void setSpeech(const QString &text);  // bulle « dire » au-dessus du robot (vide : aucune)
     void reset();            // robot au centre, trace effacée
     // Variables affichées en haut à gauche, dans l'ordre (nom, valeur)
     void setMonitors(const QList<QPair<QString, double>> &monitors);
@@ -51,6 +52,7 @@ private:
     int speedLevel_ = SpeedLevelDefault;
     QList<QPointF> trail_;
     QList<QPair<QString, double>> monitors_;
+    QString speech_;
     QTimer timer_;
     QElapsedTimer clock_;
     bool clawZoom_ = false;     // loupe affichée (pendant et juste après un mouvement de pince)

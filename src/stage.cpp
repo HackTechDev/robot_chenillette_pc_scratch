@@ -76,6 +76,12 @@ void Stage::reset()
     update();
 }
 
+void Stage::setSpeech(const QString &text)
+{
+    speech_ = text;
+    update();
+}
+
 void Stage::setMonitors(const QList<QPair<QString, double>> &monitors)
 {
     monitors_ = monitors;
@@ -307,6 +313,33 @@ void Stage::paintEvent(QPaintEvent *)
 
     if (const qreal opacity = clawZoomOpacity(); opacity > 0)
         paintClawZoom(p, opacity);
+
+    if (!speech_.isEmpty()) {
+        // Bulle au-dessus à droite du robot, gardée dans la scène
+        QFont bf = font();
+        bf.setPixelSize(14);
+        p.setFont(bf);
+        const QFontMetricsF bfm(bf);
+        const QRectF text = bfm.boundingRect(QRectF(0, 0, 170, 1000), Qt::TextWordWrap, speech_);
+        QRectF bubble(0, 0, text.width() + 20, text.height() + 14);
+        const QPointF robot = pos_ * UnitsPerCm;
+        bubble.moveBottomLeft(robot + QPointF(16, -30));
+        bubble.moveLeft(qBound(4.0, bubble.left(), StageW - bubble.width() - 4));
+        bubble.moveTop(qBound(4.0, bubble.top(), StageH - bubble.height() - 4));
+        QPainterPath path;
+        path.addRoundedRect(bubble, 10, 10);
+        QPainterPath tail;  // pointe vers le robot
+        const QPointF base(qBound(bubble.left() + 14, robot.x() + 6, bubble.right() - 14), bubble.bottom());
+        tail.moveTo(base + QPointF(-8, -1));
+        tail.lineTo(robot + QPointF(4, -16));
+        tail.lineTo(base + QPointF(8, -1));
+        tail.closeSubpath();
+        p.setPen(QPen(QColor(0xB0, 0xB0, 0xB0), 1.5));
+        p.setBrush(Qt::white);
+        p.drawPath(path.united(tail));
+        p.setPen(QColor(0x33, 0x33, 0x33));
+        p.drawText(bubble.adjusted(10, 7, -10, -7), Qt::TextWordWrap | Qt::AlignCenter, speech_);
+    }
 
     // Jauge de la tête
     const QRectF gauge(StageW - 18, StageH - 70, 8, 56);

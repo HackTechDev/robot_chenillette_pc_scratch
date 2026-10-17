@@ -222,6 +222,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     stage_ = new Stage;
     stage_->setFixedSize(360, 270);
     connect(&runner_, &Runner::sent, stage_, &Stage::command);
+    connect(&runner_, &Runner::said, stage_, &Stage::setSpeech);
     QPushButton *replace = button(QStringLiteral("⟲ Replacer"), QStringLiteral("small"),
                                   QStringLiteral("Remettre le robot au centre et effacer la trace"));
     connect(replace, &QPushButton::clicked, stage_, &Stage::reset);

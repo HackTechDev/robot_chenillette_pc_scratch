@@ -18,6 +18,7 @@ constexpr QRgb Control = 0xFFAB19;
 constexpr QRgb Variables = 0xFF8C1A;
 constexpr QRgb Operators = 0x59C059;
 constexpr QRgb MyBlocks = 0xFF6680;
+constexpr QRgb Looks = 0xCF63CF;
 
 const Spec Specs[] = {
     {Kind::Start, "start", "quand ▶ est cliqué", Events, Shape::Hat, Param::None, 0, 0, 0},
@@ -63,8 +64,12 @@ const Spec Specs[] = {
     {Kind::Or, "or", "%1 ou %2", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
     {Kind::Not, "not", "non %1", Operators, Shape::Boolean, Param::Bool, 0, 0, 0},
     {Kind::ParamValue, "param", "%n", MyBlocks, Shape::Reporter, Param::None, 0, 0, 0},
+    {Kind::Say, "say", "dire %t", Looks, Shape::Stack, Param::None, 0, 0, 0},
+    {Kind::SayFor, "say_for", "dire %t pendant %1 s", Looks, Shape::Stack, Param::Seconds, 0, 2, 0},
 };
-static_assert(std::size(Specs) == size_t(Kind::ParamValue) + 1);
+static_assert(std::size(Specs) == size_t(Kind::SayFor) + 1);
+
+const QString DefaultText = QStringLiteral("Bonjour !");
 
 // Espace, flèches, lettres, chiffres (Qt::Key ne dépend pas de la disposition du clavier)
 struct KeyDef {
@@ -128,6 +133,11 @@ const Spec &specOf(Kind kind)
     return Specs[int(kind)];
 }
 
+bool hasText(const Spec &s)
+{
+    return QString::fromUtf8(s.text).contains(QLatin1String("%t"));
+}
+
 int inputCount(const Spec &s)
 {
     const QString text = QString::fromUtf8(s.text);
@@ -148,6 +158,7 @@ const QList<Category> &categories()
           Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft, Kind::GoRight, Kind::Stop,
           Kind::Speed}},
         {QStringLiteral("Pince et tête"), Tools, {Kind::ClawClose, Kind::ClawOpen, Kind::HeadUp, Kind::HeadDown}},
+        {QStringLiteral("Apparence"), Looks, {Kind::Say, Kind::SayFor}},
         {QStringLiteral("Contrôle"), Control,
          {Kind::Wait, Kind::Repeat, Kind::Forever, Kind::If, Kind::IfElse, Kind::RepeatUntil}},
         {QStringLiteral("Opérateurs"), Operators,
@@ -161,6 +172,8 @@ Block::Block(Kind k) : kind(k)
 {
     inputs[0].value = specOf(k).def;
     inputs[1].value = specOf(k).def2;
+    if (hasText(specOf(k)))
+        text = DefaultText;
 }
 
 int inputCount(const Block *b)
@@ -271,6 +284,11 @@ QJsonObject blockToJson(const Block *b)
     }
     if (!b->name.isEmpty())
         o[QStringLiteral("name")] = b->name;
+    if (hasText(s)) {
+        o[QStringLiteral("text")] = b->text;
+        if (const Block *r = b->inputs[TextInput].reporter.get())
+            o[InputKeys[TextInput][1]] = blockToJson(r);
+    }
     if (b->body)
         o[QStringLiteral("body")] = blocksToJson(b->body.get());
     if (b->body2)
@@ -297,6 +315,12 @@ BlockPtr blockFromJson(const QJsonObject &o)
             b->inputs[i].reporter = std::move(r);
     }
     b->name = o[QStringLiteral("name")].toString();
+    if (hasText(*s)) {
+        b->text = o[QStringLiteral("text")].toString(DefaultText);
+        BlockPtr r = blockFromJson(o[InputKeys[TextInput][1]].toObject());
+        if (r && isReporter(r->spec().shape))  // texte : n'importe quel reporter
+            b->inputs[TextInput].reporter = std::move(r);
+    }
     if (hasBody(s->shape))
         b->body = blocksFromJson(o[QStringLiteral("body")].toArray(), false);
     if (hasElse(s->shape))
