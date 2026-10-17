@@ -10,7 +10,7 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 
 - Glisser-déposer à la souris : depuis la palette, entre scripts, vers la palette (suppression), aperçu fantôme.
 - Connexion Bluetooth, exécution, pas à pas, arrêts de sécurité (■, Échap, déconnexion, fermeture, perte de liaison).
-- **Calibrer la scène** : mesurer les déplacements du robot avec les exemples Carré et Aller-retour, puis ajuster `UnitsPerSpeed` et `DegreesPerSpeed` dans `src/stage.cpp`. Ajuster ensuite les durées des exemples (`examples/*.batmobile`) si les angles ne tombent pas juste.
+- **Calibrer le robot** avec l'assistant (⚙ Calibrer… sous la scène) : avancer, reculer, pivoter ↺ et ↻, à quelques vitesses (par exemple 2, 4, 6) ; vérifier ensuite avec les exemples Carré et Aller-retour (en cm et degrés) que le robot revient à son point de départ. Contrôler aussi la dérive latérale en ligne droite (chenilles inégales), que le calibrage ne corrige pas.
 
 ## Robot
 

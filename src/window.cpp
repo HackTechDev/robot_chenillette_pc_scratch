@@ -1,6 +1,7 @@
 #include "window.h"
 
 #include "bluez.h"
+#include "calibrationdialog.h"
 #include "canvas.h"
 #include "config.h"
 #include "pairing.h"
@@ -65,6 +66,13 @@ QString calibrationPath()
     return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
         .filePath(QStringLiteral("calibration.json"));
 }
+
+const char *const CalibrationStyle = R"(
+QPushButton { border: 1px solid #555; border-radius: 6px; padding: 6px 12px; }
+QPushButton:hover { border-color: #888; }
+QPushButton:disabled { color: #555; border-color: #333; }
+QSpinBox, QDoubleSpinBox, QComboBox { background: #2a2a2a; border: 1px solid #555; border-radius: 4px; padding: 4px; }
+)";
 
 const char *const Style = R"(
 QWidget { background: #111; color: #fff; }
@@ -215,11 +223,18 @@ Window::Window(QWidget *parent) : QWidget(parent)
     QPushButton *replace = button(QStringLiteral("⟲ Replacer"), QStringLiteral("small"),
                                   QStringLiteral("Remettre le robot au centre et effacer la trace"));
     connect(replace, &QPushButton::clicked, stage_, &Stage::reset);
+    QPushButton *calibrate = button(QStringLiteral("⚙ Calibrer…"), QStringLiteral("small"),
+                                    QStringLiteral("Mesurer les distances et les angles du vrai robot"));
+    connect(calibrate, &QPushButton::clicked, this, &Window::openCalibration);
+    auto *stageButtons = new QHBoxLayout;
+    stageButtons->addWidget(replace);
+    stageButtons->addWidget(calibrate);
+    stageButtons->addStretch();
     auto *stageCol = new QVBoxLayout;
     stageCol->setContentsMargins(12, 0, 0, 0);
     stageCol->addWidget(label(QStringLiteral("Scène (simulation)"), QStringLiteral("section")));
     stageCol->addWidget(stage_);
-    stageCol->addWidget(replace, 0, Qt::AlignLeft);
+    stageCol->addLayout(stageButtons);
     QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. Terrain de "
                                              "160 × 120 cm ; distances et angles d'après le calibrage."),
                               QStringLiteral("hint"));
@@ -455,6 +470,8 @@ void Window::onLost()
 void Window::setConnected(bool on)
 {
     connected_ = on;
+    if (calibrationDialog_)
+        calibrationDialog_->setConnected(on);
     btButton_->setEnabled(true);
     btButton_->setText(on ? QStringLiteral("Connecté — %1").arg(connectedName_) : QStringLiteral("Connecter"));
     btButton_->setProperty("connected", on);
@@ -542,14 +559,55 @@ bool Window::startRun(const Block *first, bool stepByStep, bool resetSpeed, cons
     return true;
 }
 
+void Window::openCalibration()
+{
+    if (!calibrationDialog_) {
+        calibrationDialog_ = new CalibrationDialog(calibration_, this);
+        calibrationDialog_->setStyleSheet(CalibrationStyle);
+        connect(calibrationDialog_, &CalibrationDialog::trialRequested, this, &Window::runTrial);
+        connect(calibrationDialog_, &CalibrationDialog::calibrationChanged, this, [this](const Calibration &c) {
+            calibration_ = c;
+            applyCalibration();
+            if (!calibration_.save(calibrationPath()))
+                status_->setText(QStringLiteral("Calibrage non enregistré : %1").arg(calibrationPath()));
+        });
+    }
+    calibrationDialog_->setConnected(connected_);
+    calibrationDialog_->setRunning(runner_.isRunning());
+    calibrationDialog_->show();
+    calibrationDialog_->raise();
+    calibrationDialog_->activateWindow();
+}
+
 void Window::applyCalibration()
 {
     runner_.setCalibration(calibration_);
     stage_->setCalibration(calibration_);
 }
 
+void Window::runTrial(Calibration::Motion motion, int level, double seconds)
+{
+    if (runner_.isRunning())
+        return;
+    // Petit programme : vitesse, puis le mouvement pendant la durée demandée
+    static const Kind Timed[] = {Kind::Forward, Kind::Backward, Kind::Left, Kind::Right};
+    trial_ = std::make_unique<Block>(Kind::Speed);
+    trial_->inputs[0].value = level;
+    trial_->next = std::make_unique<Block>(Timed[motion]);
+    trial_->next->inputs[0].value = seconds;
+    stage_->reset();
+    startRun(trial_.get(), false, true,
+             QStringLiteral("Essai de calibrage : %1 pendant %2 s, vitesse %3")
+                 .arg(Calibration::motionName(motion), formatValue(Param::Seconds, seconds))
+                 .arg(level));
+    if (calibrationDialog_)
+        calibrationDialog_->setRunning(runner_.isRunning());
+}
+
 void Window::onFinished()
 {
+    if (calibrationDialog_)
+        calibrationDialog_->setRunning(false);
     canvas_->setRunning(false);
     palette_->setLocked(false);
     setRunButtonsEnabled(true);

@@ -54,7 +54,7 @@ Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne p
 | Attraper un objet | ouvrir la pince, avancer de 20 cm, fermer, lever la tête, reculer de 20 cm, reposer |
 | Danse | vitesse 6, répéter indéfiniment : gauche, droite, tête haut, tête bas (■ pour arrêter) |
 
-Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibré, ils tombent juste sur le vrai robot aussi.
+Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibré (voir **Calibrage**), ils tombent juste sur le vrai robot aussi.
 
 **Sauvegarde automatique** : le programme en cours, enregistré ou non, est sauvegardé une seconde après chaque modification et à la fermeture, dans `~/.local/share/batmobile_scratch/autosave.batmobile`. Il est rouvert au lancement suivant (même après un plantage), avec son nom de fichier et l'astérisque s'il n'était pas enregistré. Quitter ne demande donc plus d'enregistrer.
 
@@ -63,6 +63,15 @@ Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibr�
 À droite, le robot vu de dessus suit les commandes du programme, robot connecté ou non : déplacements avec la trace du parcours, ouverture de la pince, jauge de la hauteur de la tête. Pendant un bloc « ouvrir / fermer la pince », une **loupe** en bas à gauche montre la pince en grand qui s'ouvre ou se ferme (« s'ouvre… », « se ferme… », puis « ouverte », « fermée » ou « ouverte à N % ») ; elle s'efface une seconde après. **⟲ Replacer** le remet au centre et efface la trace. Il bute sur les bords de la scène.
 
 Le terrain mesure **160 × 120 cm** (carreaux de 10 cm) et le robot y est dessiné à l'échelle (~12 cm). La scène utilise le **calibrage** : vitesse en cm/s, démarrage progressif en ligne droite (comme le firmware, qui accélère sur ~0,4 s à la vitesse 200), pivots en °/s. Sans calibrage, valeurs par défaut : 20 cm/s et 180°/s à la vitesse 4.
+
+## Calibrage
+
+Pour que « avancer de 20 cm » fasse vraiment 20 cm, le robot doit être mesuré : **⚙ Calibrer…** sous la scène ouvre l'assistant (robot connecté, sur le sol habituel, piles chargées).
+
+- **Avancer / reculer** : choisir la vitesse, aligner l'avant du robot sur le 0 d'un mètre ruban, **Lancer 1 s**, noter la distance ; replacer, **Lancer 3 s**, noter ; **Calculer et enregistrer**. L'assistant en déduit la vitesse établie (cm/s) et le temps perdu au démarrage (la rampe du firmware) : distance ≈ vitesse × (durée − départ).
+- **Pivoter ↺ / ↻** : poser le robot sur une feuille avec un trait sous l'avant, ajuster la durée et **Lancer** jusqu'à ce que le robot fasse exactement un tour, puis **Enregistrer** (°/s = 360 / durée). Mesurer un tour complet est bien plus précis qu'un quart de tour.
+
+Quelques vitesses suffisent (par exemple 2, 4 et 6) : les autres sont interpolées entre deux mesures, ou proportionnelles à la vitesse moteur au-delà. Le tableau de l'assistant montre, pour chaque vitesse, la valeur utilisée (mesurée ou déduite) ; **Valeurs par défaut pour ce mouvement** efface les mesures. Le calibrage est enregistré dans `~/.local/share/batmobile_scratch/calibration.json` (commun à tous les programmes) et sert aux blocs en cm / degrés et à la scène. Refaire les mesures si le sol ou les piles changent beaucoup.
 
 ## Blocs
 

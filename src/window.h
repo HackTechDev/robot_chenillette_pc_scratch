@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <QWidget>
 
+class CalibrationDialog;
 class Canvas;
 class Palette;
 class Pairing;
@@ -52,7 +53,9 @@ private:
     void setRunButtonsEnabled(bool on);
     void onPaused();
     void onFinished();
+    void openCalibration();
     void applyCalibration();
+    void runTrial(Calibration::Motion motion, int level, double seconds);
     void createVariable();
     void createBlock();
     void updateMonitors();
@@ -74,6 +77,8 @@ private:
     bool connected_ = false;
     bool keyRun_ = false;  // l'exécution en cours vient d'une touche
     Calibration calibration_;
+    CalibrationDialog *calibrationDialog_ = nullptr;
+    BlockPtr trial_;  // programme d'un essai de calibrage (gardé pendant l'exécution)
     QString connectedName_;
     Pairing *pairing_ = nullptr;
     bool modified_ = false;
