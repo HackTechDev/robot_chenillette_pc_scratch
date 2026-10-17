@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QLineEdit>
 #include <QMenu>
+#include <QPlainTextEdit>
 #include <QPainter>
 #include <QRegularExpressionValidator>
 #include <QScrollArea>
@@ -31,6 +32,12 @@ constexpr qreal ZoomStep = 1.25;
 constexpr int WheelNotch = 120;
 constexpr int WheelCommitMs = 600;
 constexpr qreal ArrangeGap = 24;
+const QSizeF CommentSize(200, 110);
+const QSizeF CommentMin(90, 50);
+constexpr qreal CommentHeader = 18;  // bandeau du haut (on saisit la note par là ou ailleurs)
+constexpr qreal CommentGrip = 14;    // coin bas-droit : redimensionner
+const QColor CommentColor(0xFE, 0xF4, 0x9C);
+const QColor CommentHeaderColor(0xF2, 0xE4, 0x7A);
 const QPointF FirstScript(40, 40);
 const QString Format = QStringLiteral("batmobile-scratch");
 
@@ -43,6 +50,9 @@ Canvas::Canvas(QWidget *parent) : QWidget(parent)
     editor_->setAlignment(Qt::AlignCenter);
     editor_->hide();
     connect(editor_, &QLineEdit::editingFinished, this, &Canvas::commitEdit);
+    noteEditor_ = new QPlainTextEdit(this);
+    noteEditor_->hide();
+    noteEditor_->installEventFilter(this);
     wheelCommit_.setSingleShot(true);
     wheelCommit_.setInterval(WheelCommitMs);
     connect(&wheelCommit_, &QTimer::timeout, this, &Canvas::edited);
@@ -55,6 +65,7 @@ void Canvas::clear()
 {
     commitEdit();
     scripts_.clear();
+    comments_.clear();
     addScript(FirstScript, std::make_unique<Block>(Kind::Start));
     setVariables({});
     relayout();
@@ -64,6 +75,16 @@ void Canvas::clear()
 
 QJsonObject Canvas::save() const
 {
+    QJsonArray comments;
+    for (const auto &c : comments_) {
+        comments.append(QJsonObject{
+            {QStringLiteral("x"), c->rect.x()},
+            {QStringLiteral("y"), c->rect.y()},
+            {QStringLiteral("w"), c->rect.width()},
+            {QStringLiteral("h"), c->rect.height()},
+            {QStringLiteral("text"), c->text},
+        });
+    }
     QJsonArray scripts;
     for (const auto &s : scripts_) {
         if (s->top) {
@@ -79,6 +100,7 @@ QJsonObject Canvas::save() const
         {QStringLiteral("version"), 1},
         {QStringLiteral("variables"), QJsonArray::fromStringList(variables_)},
         {QStringLiteral("scripts"), scripts},
+        {QStringLiteral("comments"), comments},
     };
 }
 
@@ -147,6 +169,16 @@ void Canvas::resetHistory()
 void Canvas::restore(const QJsonObject &o)
 {
     scripts_.clear();
+    comments_.clear();
+    for (const QJsonValue &v : o[QStringLiteral("comments")].toArray()) {
+        const QJsonObject c = v.toObject();
+        auto comment = std::make_unique<Comment>();
+        comment->rect = QRectF(c[QStringLiteral("x")].toDouble(), c[QStringLiteral("y")].toDouble(),
+                               qMax(CommentMin.width(), c[QStringLiteral("w")].toDouble(CommentSize.width())),
+                               qMax(CommentMin.height(), c[QStringLiteral("h")].toDouble(CommentSize.height())));
+        comment->text = c[QStringLiteral("text")].toString();
+        comments_.push_back(std::move(comment));
+    }
     for (const QJsonValue &v : o[QStringLiteral("scripts")].toArray()) {
         const QJsonObject s = v.toObject();
         if (BlockPtr top = blocksFromJson(s[QStringLiteral("blocks")].toArray()))
@@ -300,12 +332,16 @@ void Canvas::relayout()
         while (itemScripts_.size() < items_.size())
             itemScripts_.append(s.get());
     }
-    const QRectF r = blockview::bounds(items_);
-    if (!items_.isEmpty() && (r.left() < 0 || r.top() < 0)) {
-        // Un script remonté au-dessus du bord : tout redescendre
+    QRectF r = blockview::bounds(items_);
+    for (const auto &c : comments_)
+        r |= c->rect;
+    if (!r.isNull() && (r.left() < 0 || r.top() < 0)) {
+        // Un script ou un commentaire remonté au-dessus du bord : tout redescendre
         const QPointF shift(qMax(0.0, Margin - r.left()), qMax(0.0, Margin - r.top()));
         for (const auto &s : scripts_)
             s->pos += shift;
+        for (const auto &c : comments_)
+            c->rect.translate(shift);
         return relayout();
     }
     setMinimumSize(int((r.right() + 300) * zoom_), int((r.bottom() + 300) * zoom_));  // place pour agrandir
@@ -412,15 +448,67 @@ void Canvas::paintEvent(QPaintEvent *e)
         blockview::paint(p, it, it.block == current_, ghostBlocks_.contains(it.block));
     for (const Item &it : ghostItems_)
         blockview::paint(p, it, false, true);
+
+    // Commentaires, au-dessus des blocs
+    QFont f = font();
+    f.setPixelSize(12);
+    p.setFont(f);
+    for (const auto &c : comments_) {
+        const QRectF r = c->rect;
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 60));
+        p.drawRoundedRect(r.translated(2, 3), 6, 6);  // ombre
+        p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1));
+        p.setBrush(CommentColor);
+        p.drawRoundedRect(r, 6, 6);
+        p.setPen(Qt::NoPen);
+        p.setBrush(CommentHeaderColor);
+        QPainterPath header;
+        header.addRoundedRect(QRectF(r.left(), r.top(), r.width(), CommentHeader + 6), 6, 6);
+        p.drawPath(header.intersected([&] {
+            QPainterPath clip;
+            clip.addRect(QRectF(r.left(), r.top(), r.width(), CommentHeader));
+            return clip;
+        }()));
+        if (c.get() != editedComment_) {
+            p.setPen(QColor(0x57, 0x4D, 0x1E));
+            p.save();
+            const QRectF body = r.adjusted(6, CommentHeader + 2, -6, -4);
+            p.setClipRect(body);
+            p.drawText(body, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
+                       c->text.isEmpty() ? QStringLiteral("(clic pour écrire)") : c->text);
+            p.restore();
+        }
+        // Poignée de redimensionnement
+        p.setPen(QPen(QColor(0xB8, 0xA8, 0x45), 1.5));
+        for (qreal d = 4; d <= 10; d += 3)
+            p.drawLine(QPointF(r.right() - d, r.bottom() - 2), QPointF(r.right() - 2, r.bottom() - d));
+    }
 }
 
 void Canvas::mousePressEvent(QMouseEvent *e)
 {
     commitEdit();
     pressItem_ = -1;
+    pressComment_ = nullptr;
     pressPos_ = toModel(e->position());
-    if (e->button() == Qt::LeftButton)
+    if (e->button() == Qt::LeftButton) {
+        // Commentaire : au premier plan, puis déplacé ou redimensionné
+        if (const int c = commentAt(pressPos_); c >= 0) {
+            std::rotate(comments_.begin() + c, comments_.begin() + c + 1, comments_.end());
+            pressComment_ = comments_.back().get();
+            commentStart_ = pressComment_->rect;
+            const QPointF corner = commentStart_.bottomRight();
+            commentAction_ = (corner - pressPos_).x() < CommentGrip && (corner - pressPos_).y() < CommentGrip
+                                 ? CommentAction::Resize
+                                 : CommentAction::None;  // Move une fois le seuil de glisser dépassé
+            if (commentAction_ == CommentAction::Resize)
+                setCursor(Qt::SizeFDiagCursor);
+            update();
+            return;
+        }
         pressItem_ = itemAt(pressPos_);
+    }
     // Fond saisi (ou bouton du milieu) : déplacement de la vue
     if ((e->button() == Qt::LeftButton && pressItem_ < 0) || e->button() == Qt::MiddleButton) {
         panning_ = true;
@@ -431,6 +519,20 @@ void Canvas::mousePressEvent(QMouseEvent *e)
 
 void Canvas::mouseMoveEvent(QMouseEvent *e)
 {
+    if (pressComment_ && (e->buttons() & Qt::LeftButton)) {
+        const QPointF delta = toModel(e->position()) - pressPos_;
+        if (commentAction_ == CommentAction::None && (delta * zoom_).manhattanLength() >= QApplication::startDragDistance()) {
+            commentAction_ = CommentAction::Move;
+            setCursor(Qt::ClosedHandCursor);
+        }
+        if (commentAction_ == CommentAction::Move)
+            pressComment_->rect.moveTopLeft(commentStart_.topLeft() + delta);
+        else if (commentAction_ == CommentAction::Resize)
+            pressComment_->rect.setSize(QSizeF(qMax(CommentMin.width(), commentStart_.width() + delta.x()),
+                                               qMax(CommentMin.height(), commentStart_.height() + delta.y())));
+        update();
+        return;
+    }
     if (panning_) {
         // Position globale : le widget se déplace pendant le défilement
         const QPointF delta = e->globalPosition() - panLast_;
@@ -451,6 +553,16 @@ void Canvas::mouseMoveEvent(QMouseEvent *e)
 
 void Canvas::mouseReleaseEvent(QMouseEvent *e)
 {
+    if (Comment *c = std::exchange(pressComment_, nullptr)) {
+        unsetCursor();
+        if (commentAction_ == CommentAction::None)
+            editComment(c);  // simple clic : écrire
+        else
+            relayout();  // déplacé : la zone peut s'agrandir
+        commentAction_ = CommentAction::None;
+        edited();  // sans effet si rien n'a bougé
+        return;
+    }
     if (panning_) {
         panning_ = false;
         unsetCursor();
@@ -472,7 +584,7 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
 void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
 {
     const QPointF m = toModel(e->position());
-    const int i = itemAt(m);
+    const int i = commentAt(m) >= 0 ? -1 : itemAt(m);
     if (e->button() != Qt::LeftButton || i < 0 || running_ || items_[i].valueAt(m) >= 0
         || (!items_[i].var.isNull() && items_[i].var.contains(m)))
         return mousePressEvent(e);
@@ -482,19 +594,32 @@ void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
 
 void Canvas::contextMenuEvent(QContextMenuEvent *e)
 {
+    commitEdit();
+    const QPointF m = toModel(e->pos());
+    if (const int c = commentAt(m); c >= 0) {
+        // Les commentaires restent modifiables pendant l'exécution
+        QMenu menu(this);
+        QAction *del = menu.addAction(QStringLiteral("Supprimer le commentaire"));
+        if (menu.exec(e->globalPos()) == del)
+            removeComment(c);
+        return;
+    }
     if (running_)
         return;
-    commitEdit();
-    const int i = itemAt(toModel(e->pos()));
+    const int i = itemAt(m);
     if (i < 0) {
         // Menu du fond
         QMenu menu(this);
+        QAction *note = menu.addAction(QStringLiteral("Ajouter un commentaire"));
+        menu.addSeparator();
         QAction *arrange = menu.addAction(QStringLiteral("Ranger les scripts"));
         QAction *all = menu.addAction(QStringLiteral("Tout supprimer"));
         arrange->setEnabled(!items_.isEmpty());
-        all->setEnabled(!items_.isEmpty());
+        all->setEnabled(!items_.isEmpty() || !comments_.empty());
         QAction *chosen = menu.exec(e->globalPos());
-        if (chosen == arrange)
+        if (chosen == note)
+            addComment(m);
+        else if (chosen == arrange)
             arrangeScripts();
         else if (chosen == all)
             removeAll();
@@ -503,11 +628,14 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
     QMenu menu(this);
     QAction *dup = menu.addAction(QStringLiteral("Dupliquer"));
     QAction *del = menu.addAction(QStringLiteral("Supprimer le bloc"));
+    QAction *note = menu.addAction(QStringLiteral("Ajouter un commentaire"));
     QAction *chosen = menu.exec(e->globalPos());
     if (chosen == dup)
         duplicate(i);
     else if (chosen == del)
         removeBlock(i);
+    else if (chosen == note)  // à droite du bloc
+        addComment(items_[i].pos + QPointF(items_[i].width + 24, 0));
 }
 
 void Canvas::startDrag(int item)
@@ -704,6 +832,7 @@ void Canvas::chooseVariable(int item)
 
 void Canvas::commitEdit()
 {
+    commitComment();
     // Valeur changée à la molette : l'étape d'annulation est enregistrée maintenant
     if (wheelCommit_.isActive()) {
         wheelCommit_.stop();
@@ -852,6 +981,76 @@ void Canvas::removeAll()
 {
     commitEdit();
     scripts_.clear();
+    comments_.clear();
     relayout();
     edited();
+}
+
+// --- Commentaires ---
+
+int Canvas::commentAt(const QPointF &pos) const
+{
+    for (int i = int(comments_.size()) - 1; i >= 0; --i) {
+        if (comments_[i]->rect.contains(pos))
+            return i;
+    }
+    return -1;
+}
+
+void Canvas::addComment(const QPointF &pos, const QString &text)
+{
+    commitEdit();
+    auto c = std::make_unique<Comment>();
+    c->rect = QRectF(QPointF(qMax(Margin, pos.x()), qMax(Margin, pos.y())), CommentSize);
+    c->text = text;
+    Comment *added = c.get();
+    comments_.push_back(std::move(c));
+    relayout();
+    edited();
+    if (text.isEmpty())
+        editComment(added);  // prêt à écrire
+}
+
+void Canvas::removeComment(int index)
+{
+    commitEdit();
+    comments_.erase(comments_.begin() + index);
+    relayout();
+    edited();
+}
+
+void Canvas::editComment(Comment *c)
+{
+    editedComment_ = c;
+    const QRectF body = c->rect.adjusted(2, CommentHeader, -2, -2);
+    noteEditor_->setStyleSheet(QStringLiteral("QPlainTextEdit { background: #FEF49C; color: #574D1E; border: none;"
+                                              " font-size: %1px; }")
+                                   .arg(qRound(12 * zoom_)));
+    noteEditor_->setGeometry(QRectF(body.topLeft() * zoom_, body.size() * zoom_).toAlignedRect());
+    noteEditor_->setPlainText(c->text);
+    noteEditor_->moveCursor(QTextCursor::End);
+    noteEditor_->show();
+    noteEditor_->setFocus();
+    update();
+}
+
+void Canvas::commitComment()
+{
+    Comment *c = std::exchange(editedComment_, nullptr);
+    if (!c)
+        return;
+    noteEditor_->hide();  // la perte de focus qui suit ne fait plus rien
+    update();
+    const QString text = noteEditor_->toPlainText();
+    if (text == c->text)
+        return;
+    c->text = text;
+    edited();
+}
+
+bool Canvas::eventFilter(QObject *o, QEvent *e)
+{
+    if (o == noteEditor_ && e->type() == QEvent::FocusOut)
+        commitComment();
+    return QWidget::eventFilter(o, e);
 }

@@ -1,6 +1,6 @@
 # Améliorations à faire
 
-Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2 à 8, 10 à 14, 16, 17).
+Améliorations proposées le 17/10/2026 et pas encore réalisées. Les numéros sont ceux de la liste d'origine : les numéros manquants correspondent aux améliorations déjà faites (2 à 14, 16, 17).
 
 ## Priorité
 
@@ -11,12 +11,6 @@ Tout a été vérifié uniquement par des tests hors écran (sans souris réelle
 - Glisser-déposer à la souris : depuis la palette, entre scripts, vers la palette (suppression), aperçu fantôme.
 - Connexion Bluetooth, exécution, pas à pas, arrêts de sécurité (■, Échap, déconnexion, fermeture, perte de liaison).
 - **Calibrer la scène** : mesurer les déplacements du robot avec les exemples Carré et Aller-retour, puis ajuster `UnitsPerSpeed` et `DegreesPerSpeed` dans `src/stage.cpp`. Ajuster ensuite les durées des exemples (`examples/*.batmobile`) si les angles ne tombent pas juste.
-
-## Éditeur
-
-### 9. Commentaires
-
-Notes jaunes à poser à côté des scripts (texte libre, déplaçables, enregistrées dans le fichier `.batmobile` et l'historique d'annulation).
 
 ## Robot
 

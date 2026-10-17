@@ -33,7 +33,8 @@ Dans la zone de programme :
 - clic sur un script : l'exécuter seul, comme dans Scratch ; **robot connecté, il faut un double-clic** (un clic involontaire ne fait pas bouger le robot) ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
 - clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent) ;
-- clic droit sur le fond : **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (annulables avec ↶) ;
+- clic droit sur le fond : **Ajouter un commentaire**, **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (scripts et commentaires ; annulables avec ↶) ;
+- **commentaires** (notes jaunes) : clic droit sur le fond ou sur un bloc → **Ajouter un commentaire** (à droite du bloc) ; clic sur la note pour écrire, clic ailleurs pour valider ; glisser la note pour la déplacer, son coin bas-droit pour la redimensionner ; clic droit → **Supprimer le commentaire**. Les notes sont enregistrées avec le programme et s'annulent avec ↶ ; elles ne sont pas rattachées aux blocs (elles ne suivent pas un script déplacé) ;
 - glisser le fond (ou bouton du milieu) : déplacer la vue ;
 - **zoom** de 50 à 200 % : Ctrl+molette (autour de la souris), boutons **− / 100 % / +** en bas, Ctrl++ / Ctrl+− / Ctrl+0.
 

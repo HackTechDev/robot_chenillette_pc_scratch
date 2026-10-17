@@ -21,6 +21,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QPlainTextEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -229,7 +230,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     // Bas : aide, fichiers, quitter
     QLabel *hint = label(QStringLiteral("Glisser les blocs dans la zone de programme · clic sur un nombre pour le "
                                         "modifier, molette pour l'ajuster · clic sur un script pour l'exécuter (double-clic si le robot est connecté) · "
-                                        "clic droit : dupliquer / supprimer, ranger · bloc ramené sur la palette = "
+                                        "clic droit : dupliquer / supprimer, commentaire, ranger · bloc ramené sur la palette = "
                                         "supprimé · glisser le fond : déplacer la vue · Ctrl+molette : zoom · "
                                         "Échap = arrêt"),
                          QStringLiteral("hint"));
@@ -456,7 +457,8 @@ void Window::setConnected(bool on)
 bool Window::eventFilter(QObject *o, QEvent *e)
 {
     if (e->type() != QEvent::KeyPress || QApplication::activeWindow() != this || QApplication::activePopupWidget()
-        || qobject_cast<QLineEdit *>(QApplication::focusWidget()))
+        || qobject_cast<QLineEdit *>(QApplication::focusWidget())
+        || qobject_cast<QPlainTextEdit *>(QApplication::focusWidget()))  // saisie d'un nombre ou d'un commentaire
         return QWidget::eventFilter(o, e);
     const auto *k = static_cast<QKeyEvent *>(e);
     if (k->isAutoRepeat() || (k->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))

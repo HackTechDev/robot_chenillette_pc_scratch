@@ -12,6 +12,7 @@
 #include <vector>
 
 class QLineEdit;
+class QPlainTextEdit;
 class QScrollArea;
 
 // Zone de programme : scripts posés librement, blocs emboîtés par glisser-déposer
@@ -46,7 +47,8 @@ public:
 
     // Menu du fond (annulables)
     void arrangeScripts();  // en colonne, dans l'ordre de haut en bas
-    void removeAll();
+    void removeAll();       // scripts et commentaires
+    void addComment(const QPointF &pos, const QString &text = {});  // pos : coordonnées du programme
 
     // Variables du programme (enregistrées avec lui, annulables)
     QStringList variables() const { return variables_; }
@@ -92,8 +94,15 @@ protected:
     void dragMoveEvent(QDragMoveEvent *e) override;
     void dragLeaveEvent(QDragLeaveEvent *e) override;
     void dropEvent(QDropEvent *e) override;
+    bool eventFilter(QObject *o, QEvent *e) override;  // fin de saisie d'un commentaire
 
 private:
+    // Note jaune libre (pas rattachée à un bloc)
+    struct Comment {
+        QRectF rect;
+        QString text;
+    };
+    enum class CommentAction { None, Move, Resize };
     struct Script {
         QPointF pos;
         BlockPtr top;
@@ -133,6 +142,10 @@ private:
     void updateProcedures();
     void commitEdit();
     void removeBlock(int item);
+    int commentAt(const QPointF &pos) const;  // le plus haut (dessiné en dernier), ou -1
+    void editComment(Comment *c);
+    void commitComment();
+    void removeComment(int index);
     void duplicate(int item);
 
     std::vector<std::unique_ptr<Script>> scripts_;
@@ -160,6 +173,12 @@ private:
     int editedInput_ = 0;
     QStringList variables_;
     QStringList procedures_;
+    std::vector<std::unique_ptr<Comment>> comments_;
+    Comment *pressComment_ = nullptr;
+    CommentAction commentAction_ = CommentAction::None;
+    QRectF commentStart_;     // rectangle au moment de l'appui
+    QPlainTextEdit *noteEditor_;
+    Comment *editedComment_ = nullptr;
     QList<QJsonObject> history_;
     int historyIndex_ = 0;
     QJsonObject saved_;
