@@ -27,3 +27,6 @@ ui_*.h
 *.swp
 *~
 .DS_Store
+
+# Notes personnelles (commande de reprise de session Claude)
+claude_task.md
