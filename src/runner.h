@@ -1,6 +1,8 @@
 #pragma once
 
 #include "blocks.h"
+#include "calibration.h"
+#include "config.h"
 
 #include <QHash>
 #include <QList>
@@ -37,6 +39,9 @@ public:
     void resetVariables();
     double evaluate(const Block *reporter);  // valeur d'un reporter seul (clic dessus)
 
+    // Blocs en cm / degrés : durée calculée avec ce calibrage, au niveau de vitesse en cours
+    void setCalibration(const Calibration &c) { calibration_ = c; }
+
     // Mes blocs : script « définir nom » à exécuter pour un appel (nullptr si inconnu)
     void setProcedures(std::function<const Block *(const QString &)> lookup) { procedures_ = std::move(lookup); }
 
@@ -71,6 +76,8 @@ private:
     QList<Frame> frames_;
     QHash<QString, double> vars_;
     std::function<const Block *(const QString &)> procedures_;
+    Calibration calibration_;
+    int speedLevel_ = SpeedLevelDefault;  // dernier chiffre envoyé (comme le firmware)
     quint64 waits_ = 0;  // nombre d'attentes depuis le début
     bool moving_ = false;  // commande envoyée, stop à envoyer à la fin de l'attente
     bool rolling_ = false; // « démarrer … » envoyé : le robot bouge jusqu'au prochain stop

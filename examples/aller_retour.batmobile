@@ -10,20 +10,20 @@
                     "kind": "start"
                 },
                 {
-                    "kind": "forward",
-                    "value": 1.5
+                    "kind": "forward_cm",
+                    "value": 30
                 },
                 {
-                    "kind": "right",
-                    "value": 1
+                    "kind": "right_deg",
+                    "value": 180
                 },
                 {
-                    "kind": "forward",
-                    "value": 1.5
+                    "kind": "forward_cm",
+                    "value": 30
                 },
                 {
-                    "kind": "right",
-                    "value": 1
+                    "kind": "right_deg",
+                    "value": 180
                 }
             ]
         }

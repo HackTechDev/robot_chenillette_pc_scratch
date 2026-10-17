@@ -14,8 +14,8 @@
                     "value": 1
                 },
                 {
-                    "kind": "forward",
-                    "value": 1
+                    "kind": "forward_cm",
+                    "value": 20
                 },
                 {
                     "kind": "claw_close",
@@ -26,8 +26,8 @@
                     "value": 0.5
                 },
                 {
-                    "kind": "backward",
-                    "value": 1
+                    "kind": "backward_cm",
+                    "value": 20
                 },
                 {
                     "kind": "head_down",

@@ -544,6 +544,7 @@ bool Window::startRun(const Block *first, bool stepByStep, bool resetSpeed, cons
 
 void Window::applyCalibration()
 {
+    runner_.setCalibration(calibration_);
     stage_->setCalibration(calibration_);
 }
 

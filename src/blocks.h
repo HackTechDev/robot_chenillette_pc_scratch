@@ -20,13 +20,14 @@ enum class Shape {
 };
 
 // Type des entrées numériques d'un bloc (toutes ses entrées ont le même)
-enum class Param { None, Seconds, Count, Speed, Key, Number };
+enum class Param { None, Seconds, Count, Speed, Key, Number, Distance, Angle };
 
 // L'ordre doit suivre la table Specs de blocks.cpp
 enum class Kind {
     Start, KeyHat,
     Forward, Backward, Left, Right,
     GoForward, GoBackward, GoLeft, GoRight,  // sans durée : jusqu'au prochain stop
+    ForwardCm, BackwardCm, LeftDeg, RightDeg,  // en cm / degrés : durée déduite du calibrage
     Speed, Stop,
     ClawClose, ClawOpen, HeadUp, HeadDown,
     Wait, Repeat, Forever,

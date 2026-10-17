@@ -30,6 +30,10 @@ const Spec Specs[] = {
     {Kind::GoBackward, "go_backward", "démarrer reculer", Motion, Shape::Stack, Param::None, 's', 0, 0},
     {Kind::GoLeft, "go_left", "démarrer pivoter ↺", Motion, Shape::Stack, Param::None, 'q', 0, 0},
     {Kind::GoRight, "go_right", "démarrer pivoter ↻", Motion, Shape::Stack, Param::None, 'd', 0, 0},
+    {Kind::ForwardCm, "forward_cm", "avancer de %1 cm", Motion, Shape::Stack, Param::Distance, 'z', 20, 0},
+    {Kind::BackwardCm, "backward_cm", "reculer de %1 cm", Motion, Shape::Stack, Param::Distance, 's', 20, 0},
+    {Kind::LeftDeg, "left_deg", "pivoter ↺ de %1 °", Motion, Shape::Stack, Param::Angle, 'q', 90, 0},
+    {Kind::RightDeg, "right_deg", "pivoter ↻ de %1 °", Motion, Shape::Stack, Param::Angle, 'd', 90, 0},
     {Kind::Speed, "speed", "vitesse %1", Motion, Shape::Stack, Param::Speed, 0, SpeedLevelDefault, 0},
     {Kind::Stop, "stop", "stop", Motion, Shape::Stack, Param::None, 0, 0, 0},
     {Kind::ClawClose, "claw_close", "fermer la pince pendant %1 s", Tools, Shape::Stack, Param::Seconds, 'v', 1, 0},
@@ -99,6 +103,8 @@ Range range(Param p)
     case Param::Speed: return {0, SpeedLevels - 1, 0};
     case Param::Key: return {0, double(keys().size() - 1), 0};
     case Param::Number: return {-9999, 9999, 2};
+    case Param::Distance: return {0, 500, 1};
+    case Param::Angle: return {0, 3600, 0};
     case Param::None: break;
     }
     return {0, 0, 0};
@@ -127,8 +133,9 @@ const QList<Category> &categories()
     static const QList<Category> list = {
         {QStringLiteral("Événements"), Events, {Kind::Start, Kind::KeyHat}},
         {QStringLiteral("Mouvement"), Motion,
-         {Kind::Forward, Kind::Backward, Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft,
-          Kind::GoRight, Kind::Stop, Kind::Speed}},
+         {Kind::ForwardCm, Kind::BackwardCm, Kind::LeftDeg, Kind::RightDeg, Kind::Forward, Kind::Backward,
+          Kind::Left, Kind::Right, Kind::GoForward, Kind::GoBackward, Kind::GoLeft, Kind::GoRight, Kind::Stop,
+          Kind::Speed}},
         {QStringLiteral("Pince et tête"), Tools, {Kind::ClawClose, Kind::ClawOpen, Kind::HeadUp, Kind::HeadDown}},
         {QStringLiteral("Contrôle"), Control, {Kind::Wait, Kind::Repeat, Kind::Forever}},
         {QStringLiteral("Opérateurs"), Operators,
@@ -193,6 +200,8 @@ QString valuePattern(Param p)
     case Param::Count: return QStringLiteral("\\d{0,3}");
     case Param::Speed: return QStringLiteral("\\d?");
     case Param::Number: return QStringLiteral("-?\\d{0,4}([.,]\\d{0,2})?");
+    case Param::Distance: return QStringLiteral("\\d{0,3}([.,]\\d?)?");
+    case Param::Angle: return QStringLiteral("\\d{0,4}");
     case Param::Key:  // choisie dans un menu
     case Param::None: break;
     }

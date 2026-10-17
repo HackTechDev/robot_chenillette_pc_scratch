@@ -10,32 +10,32 @@
                     "kind": "start"
                 },
                 {
-                    "kind": "right",
-                    "value": 0.5
+                    "kind": "right_deg",
+                    "value": 90
                 },
                 {
                     "kind": "repeat",
                     "value": 3,
                     "body": [
                         {
-                            "kind": "left",
-                            "value": 0.25
+                            "kind": "left_deg",
+                            "value": 45
                         },
                         {
-                            "kind": "forward",
-                            "value": 0.4
+                            "kind": "forward_cm",
+                            "value": 8
                         },
                         {
-                            "kind": "right",
-                            "value": 0.5
+                            "kind": "right_deg",
+                            "value": 90
                         },
                         {
-                            "kind": "forward",
-                            "value": 0.4
+                            "kind": "forward_cm",
+                            "value": 8
                         },
                         {
-                            "kind": "left",
-                            "value": 0.25
+                            "kind": "left_deg",
+                            "value": 45
                         }
                     ]
                 }

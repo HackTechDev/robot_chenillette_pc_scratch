@@ -48,13 +48,13 @@ Pendant l'exécution, le bloc en cours est entouré de jaune et les scripts ne p
 
 | Exemple | Ce qu'il fait |
 |---------|---------------|
-| Carré | répéter 4 fois : avancer 1 s, pivoter ↻ 0,5 s |
-| Aller-retour | avancer, demi-tour (pivoter 1 s), revenir, demi-tour |
-| Slalom | zigzag de trois virages (pivots de 0,25 s = 45°) |
-| Attraper un objet | ouvrir la pince, avancer, fermer, lever la tête, reculer, reposer |
+| Carré | répéter 4 fois : avancer de 20 cm, pivoter ↻ de 90° |
+| Aller-retour | avancer de 30 cm, demi-tour (180°), revenir, demi-tour |
+| Slalom | zigzag de trois virages (pivots de 45°) |
+| Attraper un objet | ouvrir la pince, avancer de 20 cm, fermer, lever la tête, reculer de 20 cm, reposer |
 | Danse | vitesse 6, répéter indéfiniment : gauche, droite, tête haut, tête bas (■ pour arrêter) |
 
-Les angles sont calculés pour la scène (0,5 s ≈ 90° à la vitesse par défaut) : sur le vrai robot, ajuster les durées.
+Les exemples utilisent les blocs en cm et en degrés : une fois le robot calibré, ils tombent juste sur le vrai robot aussi.
 
 **Sauvegarde automatique** : le programme en cours, enregistré ou non, est sauvegardé une seconde après chaque modification et à la fermeture, dans `~/.local/share/batmobile_scratch/autosave.batmobile`. Il est rouvert au lancement suivant (même après un plantage), avec son nom de fichier et l'astérisque s'il n'était pas enregistré. Quitter ne demande donc plus d'enregistrer.
 
@@ -70,6 +70,8 @@ Le terrain mesure **160 × 120 cm** (carreaux de 10 cm) et le robot y est dessin
 |------|-----------------|
 | quand ▶ est cliqué | début du script |
 | quand la touche [espace ▾] est pressée | début d'un script lancé au clavier |
+| avancer / reculer de N cm | `z` / `s` pendant la durée calculée avec le calibrage (à la vitesse en cours), puis stop |
+| pivoter ↺ / ↻ de N ° | `q` / `d` pendant la durée calculée avec le calibrage, puis stop |
 | avancer / reculer pendant N s | `z` / `s`, attente N s, puis stop |
 | pivoter ↺ / ↻ pendant N s | `q` / `d`, attente, stop |
 | fermer / ouvrir la pince pendant N s | `v` / `c`, attente, stop |

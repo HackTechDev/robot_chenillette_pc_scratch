@@ -14,12 +14,12 @@
                     "value": 4,
                     "body": [
                         {
-                            "kind": "forward",
-                            "value": 1
+                            "kind": "forward_cm",
+                            "value": 20
                         },
                         {
-                            "kind": "right",
-                            "value": 0.5
+                            "kind": "right_deg",
+                            "value": 90
                         }
                     ]
                 }

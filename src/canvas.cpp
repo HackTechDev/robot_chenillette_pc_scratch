@@ -887,6 +887,10 @@ void Canvas::stepValue(Block *block, int input, int steps)
         double step = 1;
         if (param == Param::Seconds)  // 0,1 s jusqu'à 2 s, puis 0,5 s
             step = (steps > 0 ? v >= 2 : v > 2) ? 0.5 : 0.1;
+        else if (param == Param::Distance)  // 1 cm jusqu'à 20 cm, puis 5 cm
+            step = (steps > 0 ? v >= 20 : v > 20) ? 5 : 1;
+        else if (param == Param::Angle)
+            step = 5;
         v = clampValue(param, v + (steps > 0 ? step : -step));
     }
     if (v == value)

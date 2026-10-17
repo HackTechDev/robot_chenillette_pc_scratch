@@ -107,6 +107,8 @@ void Runner::send(char cmd)
     emit sent(cmd);
     if (cmd == Stop)
         rolling_ = false;
+    else if (cmd >= '0' && cmd <= '9')
+        speedLevel_ = cmd - '0';
 }
 
 void Runner::stopRolling()
@@ -207,6 +209,20 @@ void Runner::step()
         case Kind::ChangeVar:
             setVariable(b->name, vars_.value(b->name) + input(b, 0));
             break;
+        case Kind::ForwardCm:
+        case Kind::BackwardCm:
+        case Kind::LeftDeg:
+        case Kind::RightDeg: {
+            const char cmd = b->spec().cmd;
+            Calibration::Motion m;
+            Calibration::motionOf(cmd, &m);
+            const double seconds = calibration_.duration(m, speedLevel_, input(b, 0, b->spec().param));
+            if (seconds <= 0)
+                break;  // 0 cm : rien à faire
+            send(cmd);
+            moving_ = true;
+            return wait(seconds);
+        }
         case Kind::GoForward:
         case Kind::GoBackward:
         case Kind::GoLeft:
