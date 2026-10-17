@@ -30,7 +30,7 @@ Dépôt : [github.com/HackTechDev/robot_chenillette_pc_scratch](https://github.c
 Dans la zone de programme :
 
 - clic sur un nombre : le modifier (virgule ou point ; durées au centième, ex. 0,25 s) ; **molette** sur un nombre : l'augmenter ou le diminuer (durées : 0,1 s par cran jusqu'à 2 s, puis 0,5 s ; nombres de tours et vitesse : 1 par cran) ;
-- clic sur un script : l'exécuter seul ;
+- clic sur un script : l'exécuter seul, comme dans Scratch ; **robot connecté, il faut un double-clic** (un clic involontaire ne fait pas bouger le robot) ;
 - glisser un bloc : il part avec les blocs qui le suivent ; le ramener sur la palette le supprime ;
 - clic droit sur un bloc : **Dupliquer** (le bloc et les suivants) ou **Supprimer le bloc** (les suivants remontent) ;
 - clic droit sur le fond : **Ranger les scripts** (en colonne à gauche, dans l'ordre de haut en bas) ou **Tout supprimer** (annulables avec ↶) ;

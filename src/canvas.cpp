@@ -341,11 +341,22 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
     pressItem_ = -1;
     if (i < 0 || e->button() != Qt::LeftButton)
         return;
-    // Clic sur la valeur : modification ; ailleurs sur le script : exécution
+    // Clic sur la valeur : modification ; ailleurs sur le script : exécution (selon la fenêtre)
     if (!items_[i].value.isNull() && items_[i].value.contains(toModel(e->position())))
         return editValue(i);
     if (!running_)
-        emit runRequested(itemScripts_[i]->top.get());
+        emit scriptClicked(itemScripts_[i]->top.get());
+}
+
+void Canvas::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    const QPointF m = toModel(e->position());
+    const int i = itemAt(m);
+    if (e->button() != Qt::LeftButton || i < 0 || running_
+        || (!items_[i].value.isNull() && items_[i].value.contains(m)))
+        return mousePressEvent(e);
+    pressItem_ = -1;  // le relâchement qui suit n'est pas un second clic
+    emit scriptDoubleClicked(itemScripts_[i]->top.get());
 }
 
 void Canvas::contextMenuEvent(QContextMenuEvent *e)

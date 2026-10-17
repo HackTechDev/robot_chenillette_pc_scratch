@@ -156,7 +156,14 @@ Window::Window(QWidget *parent) : QWidget(parent)
     auto *canvasScroll = new QScrollArea;
     canvasScroll->setWidget(canvas_);
     canvasScroll->setWidgetResizable(true);
-    connect(canvas_, &Canvas::runRequested, this, [this](const Block *first) { run(first); });
+    // Robot connecté : un simple clic ne doit pas le faire bouger par erreur
+    connect(canvas_, &Canvas::scriptClicked, this, [this](const Block *first) {
+        if (!connected_)
+            run(first);
+        else if (!runner_.isRunning())
+            status_->setText(QStringLiteral("Robot connecté : double-clic sur un script pour l'exécuter"));
+    });
+    connect(canvas_, &Canvas::scriptDoubleClicked, this, [this](const Block *first) { run(first); });
     connect(canvas_, &Canvas::changed, this, [this] { setModified(canvas_->isModified()); });
     connect(&runner_, &Runner::current, canvas_, &Canvas::setCurrent);
     connect(&runner_, &Runner::finished, this, &Window::onFinished);
@@ -191,7 +198,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
 
     // Bas : aide, fichiers, quitter
     QLabel *hint = label(QStringLiteral("Glisser les blocs dans la zone de programme · clic sur un nombre pour le "
-                                        "modifier, molette pour l'ajuster · clic sur un script pour l'exécuter · "
+                                        "modifier, molette pour l'ajuster · clic sur un script pour l'exécuter (double-clic si le robot est connecté) · "
                                         "clic droit : dupliquer / supprimer, ranger · bloc ramené sur la palette = "
                                         "supprimé · glisser le fond : déplacer la vue · Ctrl+molette : zoom · "
                                         "Échap = arrêt"),

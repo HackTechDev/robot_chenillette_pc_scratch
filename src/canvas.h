@@ -58,7 +58,9 @@ public:
     bool hasGhost() const { return ghostSlot_ != nullptr; }
 
 signals:
-    void runRequested(const Block *first);  // clic sur un script
+    // Clic / double-clic sur un script (la fenêtre décide de l'exécuter)
+    void scriptClicked(const Block *first);
+    void scriptDoubleClicked(const Block *first);
     void changed();
     void historyChanged();
     void zoomChanged(qreal zoom);
@@ -68,6 +70,7 @@ protected:
     void mousePressEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
     void contextMenuEvent(QContextMenuEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
     void dragEnterEvent(QDragEnterEvent *e) override;
