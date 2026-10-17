@@ -1,5 +1,6 @@
 #pragma once
 
+#include "calibration.h"
 #include "link.h"
 #include "runner.h"
 
@@ -51,6 +52,7 @@ private:
     void setRunButtonsEnabled(bool on);
     void onPaused();
     void onFinished();
+    void applyCalibration();
     void createVariable();
     void createBlock();
     void updateMonitors();
@@ -71,6 +73,7 @@ private:
     Runner runner_{link_};
     bool connected_ = false;
     bool keyRun_ = false;  // l'exécution en cours vient d'une touche
+    Calibration calibration_;
     QString connectedName_;
     Pairing *pairing_ = nullptr;
     bool modified_ = false;

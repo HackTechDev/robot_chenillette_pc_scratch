@@ -1,5 +1,6 @@
 #pragma once
 
+#include "calibration.h"
 #include "config.h"
 
 #include <QElapsedTimer>
@@ -8,8 +9,9 @@
 #include <QTimer>
 #include <QWidget>
 
-// Scène : le robot vu de dessus, animé d'après les commandes du programme (avec ou sans
-// robot connecté). Vitesses approximatives : à régler sur le vrai robot (stage.cpp).
+// Scène : le robot vu de dessus sur un terrain de 160 × 120 cm (carreaux de 10 cm), animé
+// d'après les commandes du programme (avec ou sans robot connecté). Vitesses du calibrage,
+// rampe d'accélération en ligne droite comme le firmware.
 class Stage : public QWidget
 {
     Q_OBJECT
@@ -18,6 +20,7 @@ public:
     explicit Stage(QWidget *parent = nullptr);
 
     void command(char cmd);  // même protocole que le robot
+    void setCalibration(const Calibration &c) { calibration_ = c; }
     void reset();            // robot au centre, trace effacée
     // Variables affichées en haut à gauche, dans l'ordre (nom, valeur)
     void setMonitors(const QList<QPair<QString, double>> &monitors);
@@ -31,13 +34,16 @@ protected:
 
 private:
     void advance();  // applique le mouvement en cours depuis le dernier appel
-    void move(qreal distance);
+    void move(qreal distance);  // cm
+    void drive(qreal dt);       // ligne droite, avec rampe
     void tick();
     bool clawMoving() const { return motion_ == 'c' || motion_ == 'v'; }
     qreal clawZoomOpacity() const;  // loupe sur la pince : 0 = cachée
     void paintClawZoom(QPainter &p, qreal opacity) const;
 
-    QPointF pos_;
+    Calibration calibration_;
+    QPointF pos_;           // cm
+    qreal velocity_ = 0;    // cm/s, signée (rampe en ligne droite)
     qreal heading_ = 0;  // degrés, 0 = vers le haut, sens horaire
     qreal claw_ = 0;     // 0 = fermée, 1 = ouverte
     qreal head_ = 0.5;   // 0 = basse, 1 = haute

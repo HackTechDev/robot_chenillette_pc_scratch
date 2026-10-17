@@ -9,15 +9,15 @@
 
 namespace {
 
-// Scène de 480 × 360 unités, comme celle de Scratch
+// Dessin sur 480 × 360 unités, comme la scène de Scratch ; terrain de 160 × 120 cm
 constexpr qreal StageW = 480;
 constexpr qreal StageH = 360;
-constexpr qreal RobotRadius = 26;  // garde le robot entier sur la scène
-
-// Approximations (vitesse firmware 40..400) : à la vitesse par défaut (200),
-// 100 unités/s en ligne droite et 180°/s en pivot
-constexpr qreal UnitsPerSpeed = 0.5;
-constexpr qreal DegreesPerSpeed = 0.9;
+constexpr qreal UnitsPerCm = 3;
+constexpr qreal FieldW = StageW / UnitsPerCm;
+constexpr qreal FieldH = StageH / UnitsPerCm;
+constexpr qreal GridCm = 10;
+constexpr qreal RobotRadius = 7;     // cm : garde le robot entier sur le terrain
+constexpr qreal RobotDrawScale = 0.25;  // dessin du robot (±24) → ~12 cm de large
 constexpr qreal ClawTravelS = 1.0;  // pince : fermée → ouverte
 constexpr qreal HeadTravelS = 1.0;  // tête : basse → haute
 constexpr int FrameMs = 16;
@@ -70,7 +70,7 @@ int Stage::heightForWidth(int w) const
 void Stage::reset()
 {
     advance();
-    pos_ = QPointF(StageW / 2, StageH / 2);
+    pos_ = QPointF(FieldW / 2, FieldH / 2);
     heading_ = 0;
     trail_ = {pos_};
     update();
@@ -91,6 +91,8 @@ void Stage::command(char cmd)
     }
     if (clawMoving() && cmd != motion_)
         clawSince_.start();  // fin du mouvement de pince : la loupe reste un moment
+    if (cmd != 'z' && cmd != 's')
+        velocity_ = 0;  // arrêt et pivot immédiats ; z ↔ s repasse par la rampe
     motion_ = cmd;
     if (clawMoving()) {
         clawZoom_ = true;
@@ -172,12 +174,11 @@ void Stage::advance()
         return;
     const qreal dt = clock_.nsecsElapsed() / 1e9;  // restart() tronquerait à la ms à chaque image
     clock_.restart();
-    const qreal speed = (speedLevel_ + 1) * SpeedPerLevel;
     switch (motion_) {
-    case 'z': move(speed * UnitsPerSpeed * dt); break;
-    case 's': move(-speed * UnitsPerSpeed * dt); break;
-    case 'q': heading_ -= speed * DegreesPerSpeed * dt; break;
-    case 'd': heading_ += speed * DegreesPerSpeed * dt; break;
+    case 'z':
+    case 's': drive(dt); break;
+    case 'q': heading_ -= calibration_.rate(Calibration::Left, speedLevel_).perS * dt; break;
+    case 'd': heading_ += calibration_.rate(Calibration::Right, speedLevel_).perS * dt; break;
     case 'c': claw_ = qMin(1.0, claw_ + dt / ClawTravelS); break;
     case 'v': claw_ = qMax(0.0, claw_ - dt / ClawTravelS); break;
     case 'w': head_ = qMin(1.0, head_ + dt / HeadTravelS); break;
@@ -187,14 +188,39 @@ void Stage::advance()
     heading_ = std::fmod(heading_ + 360, 360);
 }
 
+void Stage::drive(qreal dt)
+{
+    // Vitesse visée et accélération de la rampe : vitesse établie atteinte en 2 t0
+    const bool forward = motion_ == 'z';
+    const Calibration::Rate r = calibration_.rate(forward ? Calibration::Forward : Calibration::Backward, speedLevel_);
+    const qreal target = forward ? r.perS : -r.perS;
+    qreal distance = 0;
+    if (r.t0 <= 0) {
+        velocity_ = target;
+        distance = target * dt;
+    } else {
+        const qreal dv = target - velocity_;
+        const qreal accel = (dv > 0 ? 1 : -1) * r.perS / (2 * r.t0);
+        const qreal ramp = dv / accel;  // temps pour atteindre la vitesse visée (≥ 0)
+        const qreal t = qMin(dt, ramp);
+        distance = velocity_ * t + accel * t * t / 2;
+        velocity_ += accel * t;
+        if (dt > ramp) {
+            velocity_ = target;
+            distance += target * (dt - ramp);
+        }
+    }
+    move(distance);
+}
+
 void Stage::move(qreal distance)
 {
     const qreal a = heading_ * Pi / 180;
     pos_ += QPointF(std::sin(a) * distance, -std::cos(a) * distance);
     // Le robot bute sur les bords
-    pos_.setX(qBound(RobotRadius, pos_.x(), StageW - RobotRadius));
-    pos_.setY(qBound(RobotRadius, pos_.y(), StageH - RobotRadius));
-    if (QLineF(trail_.last(), pos_).length() > 1.5)
+    pos_.setX(qBound(RobotRadius, pos_.x(), FieldW - RobotRadius));
+    pos_.setY(qBound(RobotRadius, pos_.y(), FieldH - RobotRadius));
+    if (QLineF(trail_.last(), pos_).length() > 0.5)
         trail_.append(pos_);
 }
 
@@ -211,20 +237,26 @@ void Stage::paintEvent(QPaintEvent *)
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0xF4, 0xF4, 0xF4));
     p.drawRoundedRect(QRectF(0, 0, StageW, StageH), 6, 6);
-    p.setPen(QPen(QColor(0xDD, 0xDD, 0xDD), 1));
-    for (qreal x = 40; x < StageW; x += 40)
-        p.drawLine(QPointF(x, 0), QPointF(x, StageH));
-    for (qreal y = 40; y < StageH; y += 40)
-        p.drawLine(QPointF(0, y), QPointF(StageW, y));
+    // Terrain en cm : carreaux de 10 cm
+    p.save();
+    p.scale(UnitsPerCm, UnitsPerCm);
+    QPen grid(QColor(0xDD, 0xDD, 0xDD), 1);
+    grid.setCosmetic(true);
+    p.setPen(grid);
+    for (qreal x = GridCm; x < FieldW; x += GridCm)
+        p.drawLine(QPointF(x, 0), QPointF(x, FieldH));
+    for (qreal y = GridCm; y < FieldH; y += GridCm)
+        p.drawLine(QPointF(0, y), QPointF(FieldW, y));
 
     // Trace du parcours
-    p.setPen(QPen(QColor(0x4C, 0x97, 0xFF), 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p.setPen(QPen(QColor(0x4C, 0x97, 0xFF), 1, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     p.drawPolyline(trail_.constData(), int(trail_.size()));
 
     // Robot, avant vers le haut
     p.save();
     p.translate(pos_);
     p.rotate(heading_);
+    p.scale(RobotDrawScale, RobotDrawScale);
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0x55, 0x55, 0x55));
     p.drawRoundedRect(QRectF(-24, -20, 9, 42), 3, 3);  // chenilles
@@ -246,6 +278,7 @@ void Stage::paintEvent(QPaintEvent *)
     p.setBrush(QColor(0x11, 0x11, 0x11));
     p.drawEllipse(QPointF(0, -2 - head_ * 5), 2.5, 2.5);
     p.restore();
+    p.restore();  // fin du terrain en cm
 
     // Variables, comme les moniteurs de Scratch
     QFont mf = font();
@@ -289,4 +322,5 @@ void Stage::paintEvent(QPaintEvent *)
     p.setFont(f);
     p.setPen(QColor(0x88, 0x88, 0x88));
     p.drawText(QRectF(StageW - 60, StageH - 14, 56, 14), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("tête"));
+    p.drawText(QRectF(StageW - 120, 2, 116, 14), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("carreaux de 10 cm"));
 }

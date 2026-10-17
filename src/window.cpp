@@ -59,6 +59,13 @@ QString autosavePath()
         .filePath(QStringLiteral("autosave") + FileSuffix);
 }
 
+// ~/.local/share/batmobile_scratch/calibration.json
+QString calibrationPath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath(QStringLiteral("calibration.json"));
+}
+
 const char *const Style = R"(
 QWidget { background: #111; color: #fff; }
 QLabel#title { color: #FFD700; font-size: 24px; font-weight: bold; letter-spacing: 2px; }
@@ -213,8 +220,8 @@ Window::Window(QWidget *parent) : QWidget(parent)
     stageCol->addWidget(label(QStringLiteral("Scène (simulation)"), QStringLiteral("section")));
     stageCol->addWidget(stage_);
     stageCol->addWidget(replace, 0, Qt::AlignLeft);
-    QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. "
-                                             "Distances et angles approximatifs."),
+    QLabel *stageHint = label(QStringLiteral("Le robot dessiné suit le programme, robot connecté ou non. Terrain de "
+                                             "160 × 120 cm ; distances et angles d'après le calibrage."),
                               QStringLiteral("hint"));
     stageHint->setWordWrap(true);
     stageHint->setFixedWidth(360);
@@ -315,6 +322,9 @@ Window::Window(QWidget *parent) : QWidget(parent)
     connect(&autosaveTimer_, &QTimer::timeout, this, &Window::autosave);
 
     qApp->installEventFilter(this);  // touches reçues quel que soit le widget qui a le focus
+
+    calibration_.load(calibrationPath());
+    applyCalibration();
 
     refreshDevices();
     restoreAutosave();
@@ -530,6 +540,11 @@ bool Window::startRun(const Block *first, bool stepByStep, bool resetSpeed, cons
     status_->setText(status);  // avant start : un programme instantané se termine tout de suite
     runner_.start(first, stepByStep, resetSpeed);
     return true;
+}
+
+void Window::applyCalibration()
+{
+    stage_->setCalibration(calibration_);
 }
 
 void Window::onFinished()

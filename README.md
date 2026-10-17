@@ -62,7 +62,7 @@ Les angles sont calculés pour la scène (0,5 s ≈ 90° à la vitesse par défa
 
 À droite, le robot vu de dessus suit les commandes du programme, robot connecté ou non : déplacements avec la trace du parcours, ouverture de la pince, jauge de la hauteur de la tête. Pendant un bloc « ouvrir / fermer la pince », une **loupe** en bas à gauche montre la pince en grand qui s'ouvre ou se ferme (« s'ouvre… », « se ferme… », puis « ouverte », « fermée » ou « ouverte à N % ») ; elle s'efface une seconde après. **⟲ Replacer** le remet au centre et efface la trace. Il bute sur les bords de la scène.
 
-Les vitesses sont des approximations (`stage.cpp`) : à la vitesse par défaut, 100 unités/s en ligne droite (la scène fait 480 × 360) et 180°/s en pivot, donc **pivoter 0,5 s ≈ un quart de tour**. Le vrai robot dépend du sol et de la batterie : pour que la scène lui ressemble, mesurer ses déplacements et ajuster `UnitsPerSpeed` et `DegreesPerSpeed`.
+Le terrain mesure **160 × 120 cm** (carreaux de 10 cm) et le robot y est dessiné à l'échelle (~12 cm). La scène utilise le **calibrage** : vitesse en cm/s, démarrage progressif en ligne droite (comme le firmware, qui accélère sur ~0,4 s à la vitesse 200), pivots en °/s. Sans calibrage, valeurs par défaut : 20 cm/s et 180°/s à la vitesse 4.
 
 ## Blocs
 
