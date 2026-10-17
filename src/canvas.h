@@ -48,7 +48,8 @@ public:
     // Menu du fond (annulables)
     void arrangeScripts();  // en colonne, dans l'ordre de haut en bas
     void removeAll();       // scripts et commentaires
-    void addComment(const QPointF &pos, const QString &text = {});  // pos : coordonnées du programme
+    // pos : coordonnées du programme ; blockId : bloc auquel la note est attachée (0 = libre)
+    void addComment(const QPointF &pos, const QString &text = {}, quint64 blockId = 0);
 
     // Sélection (un bloc et ceux qui le suivent) et presse-papiers
     void copySelection();
@@ -105,10 +106,12 @@ protected:
     bool eventFilter(QObject *o, QEvent *e) override;  // fin de saisie d'un commentaire
 
 private:
-    // Note jaune libre (pas rattachée à un bloc)
+    // Note jaune, libre ou attachée à un bloc (elle suit alors son script, à offset de lui)
     struct Comment {
         QRectF rect;
         QString text;
+        quint64 blockId = 0;
+        QPointF offset;
     };
     enum class CommentAction { None, Move, Resize };
     struct Script {
@@ -151,6 +154,8 @@ private:
     void commitEdit();
     void removeBlock(int item);
     int itemOf(quint64 id) const;  // -1 si le bloc n'est plus dans le programme
+    QList<Block *> allBlocks() const;  // ordre fixe (enregistrement des attaches de commentaires)
+    void placeAttachedComments();      // dans relayout()
     QList<const Block *> selectionRoots() const;  // sans ceux contenus dans un autre bloc sélectionné
     int commentAt(const QPointF &pos) const;  // le plus haut (dessiné en dernier), ou -1
     void editComment(Comment *c);
@@ -190,6 +195,10 @@ private:
     QPlainTextEdit *noteEditor_;
     Comment *editedComment_ = nullptr;
     QList<quint64> selection_;  // ids des blocs sélectionnés
+    // Glisser-déposer interne : la pile d'origine est redéposée (ids conservés, ses
+    // commentaires la suivent) ; ses blocs, hors du programme pendant le glisser, gardent leurs notes
+    BlockPtr *dragStack_ = nullptr;
+    QSet<quint64> dragIds_;
     QList<QJsonObject> history_;
     int historyIndex_ = 0;
     QJsonObject saved_;

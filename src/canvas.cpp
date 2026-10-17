@@ -46,6 +46,18 @@ const QString Format = QStringLiteral("batmobile-scratch");
 const QString ClipboardType = QStringLiteral("application/x-batmobile-scripts");
 const QPointF PasteOffset(24, 24);
 
+// Visite en profondeur : le bloc, ses entrées, ses corps, puis les suivants
+void forEachBlock(Block *b, const std::function<void(Block *)> &f)
+{
+    for (; b; b = b->next.get()) {
+        f(b);
+        for (Input &in : b->inputs)
+            forEachBlock(in.reporter.get(), f);
+        forEachBlock(b->body.get(), f);
+        forEachBlock(b->body2.get(), f);
+    }
+}
+
 // Le bloc, ceux qui le suivent, et tout ce qu'ils contiennent
 void collectStack(const Block *b, QSet<const Block *> *out)
 {
@@ -93,15 +105,26 @@ void Canvas::clear()
 
 QJsonObject Canvas::save() const
 {
+    // Attache d'un commentaire : indice de son bloc dans allBlocks() (les ids ne sont pas enregistrés)
+    QHash<quint64, int> indexOf;
+    const QList<Block *> blocks = allBlocks();
+    for (int i = 0; i < blocks.size(); ++i)
+        indexOf[blocks[i]->id] = i;
     QJsonArray comments;
     for (const auto &c : comments_) {
-        comments.append(QJsonObject{
+        QJsonObject o{
             {QStringLiteral("x"), c->rect.x()},
             {QStringLiteral("y"), c->rect.y()},
             {QStringLiteral("w"), c->rect.width()},
             {QStringLiteral("h"), c->rect.height()},
             {QStringLiteral("text"), c->text},
-        });
+        };
+        if (const auto it = indexOf.constFind(c->blockId); c->blockId && it != indexOf.cend()) {
+            o[QStringLiteral("block")] = *it;
+            o[QStringLiteral("dx")] = c->offset.x();
+            o[QStringLiteral("dy")] = c->offset.y();
+        }
+        comments.append(o);
     }
     QJsonArray scripts;
     for (const auto &s : scripts_) {
@@ -189,6 +212,12 @@ void Canvas::restore(const QJsonObject &o)
     scripts_.clear();
     comments_.clear();
     selection_.clear();
+    for (const QJsonValue &v : o[QStringLiteral("scripts")].toArray()) {
+        const QJsonObject s = v.toObject();
+        if (BlockPtr top = blocksFromJson(s[QStringLiteral("blocks")].toArray()))
+            addScript(QPointF(s[QStringLiteral("x")].toDouble(), s[QStringLiteral("y")].toDouble()), std::move(top));
+    }
+    const QList<Block *> blocks = allBlocks();
     for (const QJsonValue &v : o[QStringLiteral("comments")].toArray()) {
         const QJsonObject c = v.toObject();
         auto comment = std::make_unique<Comment>();
@@ -196,12 +225,11 @@ void Canvas::restore(const QJsonObject &o)
                                qMax(CommentMin.width(), c[QStringLiteral("w")].toDouble(CommentSize.width())),
                                qMax(CommentMin.height(), c[QStringLiteral("h")].toDouble(CommentSize.height())));
         comment->text = c[QStringLiteral("text")].toString();
+        if (const int i = c[QStringLiteral("block")].toInt(-1); i >= 0 && i < blocks.size()) {
+            comment->blockId = blocks[i]->id;
+            comment->offset = QPointF(c[QStringLiteral("dx")].toDouble(), c[QStringLiteral("dy")].toDouble());
+        }
         comments_.push_back(std::move(comment));
-    }
-    for (const QJsonValue &v : o[QStringLiteral("scripts")].toArray()) {
-        const QJsonObject s = v.toObject();
-        if (BlockPtr top = blocksFromJson(s[QStringLiteral("blocks")].toArray()))
-            addScript(QPointF(s[QStringLiteral("x")].toDouble(), s[QStringLiteral("y")].toDouble()), std::move(top));
     }
     QStringList names;
     for (const QJsonValue &v : o[QStringLiteral("variables")].toArray())
@@ -352,6 +380,7 @@ void Canvas::relayout()
         while (itemScripts_.size() < items_.size())
             itemScripts_.append(s.get());
     }
+    placeAttachedComments();
     QRectF r = blockview::bounds(items_);
     for (const auto &c : comments_)
         r |= c->rect;
@@ -489,6 +518,17 @@ void Canvas::paintEvent(QPaintEvent *e)
     for (const Item &it : ghostItems_)
         blockview::paint(p, it, false, true);
 
+    // Liaison d'un commentaire attaché : de la droite de la ligne du bloc au bandeau de la note
+    p.setPen(QPen(QColor(0xD9, 0xC9, 0x5C), 1.5));
+    for (const auto &c : comments_) {
+        if (const int i = itemOf(c->blockId); c->blockId && i >= 0) {
+            const Item &it = items_[i];
+            const qreal rowTop = it.pos.y() + (it.block->spec().shape == Shape::Hat ? blockview::Dome : 0);
+            p.drawLine(QPointF(it.pos.x() + it.width, rowTop + it.rowH / 2),
+                       QPointF(c->rect.left(), c->rect.top() + CommentHeader / 2));
+        }
+    }
+
     // Commentaires, au-dessus des blocs
     QFont f = font();
     f.setPixelSize(12);
@@ -607,10 +647,14 @@ void Canvas::mouseReleaseEvent(QMouseEvent *e)
 {
     if (Comment *c = std::exchange(pressComment_, nullptr)) {
         unsetCursor();
-        if (commentAction_ == CommentAction::None)
+        if (commentAction_ == CommentAction::None) {
             editComment(c);  // simple clic : écrire
-        else
+        } else {
+            // Attachée : la nouvelle place est gardée par rapport au bloc
+            if (const int i = itemOf(c->blockId); c->blockId && i >= 0)
+                c->offset = c->rect.topLeft() - items_[i].pos;
             relayout();  // déplacé : la zone peut s'agrandir
+        }
         commentAction_ = CommentAction::None;
         edited();  // sans effet si rien n'a bougé
         return;
@@ -655,9 +699,16 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
     if (const int c = commentAt(m); c >= 0) {
         // Les commentaires restent modifiables pendant l'exécution
         QMenu menu(this);
+        QAction *detach = comments_[c]->blockId ? menu.addAction(QStringLiteral("Détacher du bloc")) : nullptr;
         QAction *del = menu.addAction(QStringLiteral("Supprimer le commentaire"));
-        if (menu.exec(e->globalPos()) == del)
+        QAction *chosen = menu.exec(e->globalPos());
+        if (chosen == del) {
             removeComment(c);
+        } else if (chosen && chosen == detach) {
+            comments_[c]->blockId = 0;
+            update();
+            edited();
+        }
         return;
     }
     if (running_)
@@ -699,8 +750,8 @@ void Canvas::contextMenuEvent(QContextMenuEvent *e)
         duplicate(i);
     else if (chosen == del)
         removeBlock(i);
-    else if (chosen == note)  // à droite du bloc
-        addComment(items_[i].pos + QPointF(items_[i].width + 24, 0));
+    else if (chosen == note)  // à droite du bloc, attaché à lui
+        addComment(items_[i].pos + QPointF(items_[i].width + 24, 0), {}, items_[i].block->id);
 }
 
 void Canvas::startDrag(int item)
@@ -710,9 +761,16 @@ void Canvas::startDrag(int item)
     BlockPtr *slot = items_[item].slot;
     const QPointF hot = pressPos_ - items_[item].pos;
     BlockPtr stack = std::move(*slot);
+    QSet<const Block *> blocks;
+    collectStack(stack.get(), &blocks);
+    for (const Block *b : blocks)
+        dragIds_.insert(b->id);
+    dragStack_ = &stack;
     relayout();
-    // Déposée ici, la pile est recopiée par dropEvent ; sur la palette, elle est jetée
+    // Déposée ici, dropEvent reprend la pile d'origine ; sur la palette, elle est jetée
     const Qt::DropAction action = blockview::drag(this, stack, hot, zoom_);
+    dragStack_ = nullptr;
+    dragIds_.clear();
     endDrop();  // au cas où aucun dragLeave n'a été reçu
     if (action == Qt::IgnoreAction)
         *slot = std::move(stack);  // lâchée ailleurs : remise en place
@@ -774,7 +832,9 @@ void Canvas::dropEvent(QDropEvent *e)
     removeGhost();
     if (!incoming_)
         return e->ignore();
-    drop(std::move(incoming_), toModel(e->position()) - incomingHot_);
+    // Pile venant d'ici : l'originale (mêmes blocs), pas la copie du glisser
+    BlockPtr stack = e->source() == this && dragStack_ && *dragStack_ ? std::move(*dragStack_) : std::move(incoming_);
+    drop(std::move(stack), toModel(e->position()) - incomingHot_);
     endDrop();
     e->acceptProposedAction();
     edited();
@@ -1079,12 +1139,16 @@ int Canvas::commentAt(const QPointF &pos) const
     return -1;
 }
 
-void Canvas::addComment(const QPointF &pos, const QString &text)
+void Canvas::addComment(const QPointF &pos, const QString &text, quint64 blockId)
 {
     commitEdit();
     auto c = std::make_unique<Comment>();
     c->rect = QRectF(QPointF(qMax(Margin, pos.x()), qMax(Margin, pos.y())), CommentSize);
     c->text = text;
+    if (const int i = itemOf(blockId); blockId && i >= 0) {
+        c->blockId = blockId;
+        c->offset = c->rect.topLeft() - items_[i].pos;
+    }
     Comment *added = c.get();
     comments_.push_back(std::move(c));
     relayout();
@@ -1261,4 +1325,36 @@ void Canvas::selectAll()
             selection_.append(s->top->id);
     }
     update();
+}
+
+QList<Block *> Canvas::allBlocks() const
+{
+    QList<Block *> out;
+    for (const auto &s : scripts_)
+        forEachBlock(s->top.get(), [&out](Block *b) { out.append(b); });
+    return out;
+}
+
+void Canvas::placeAttachedComments()
+{
+    // Une note suit son bloc ; si le bloc a disparu (supprimé), elle disparaît avec lui, sauf
+    // pendant que le bloc est en train d'être glissé
+    for (auto it = comments_.begin(); it != comments_.end();) {
+        Comment *c = it->get();
+        if (c->blockId) {
+            if (const int i = itemOf(c->blockId); i >= 0) {
+                c->rect.moveTopLeft(items_[i].pos + c->offset);
+            } else if (!dragIds_.contains(c->blockId)) {
+                if (editedComment_ == c) {
+                    editedComment_ = nullptr;
+                    noteEditor_->hide();
+                }
+                if (pressComment_ == c)
+                    pressComment_ = nullptr;
+                it = comments_.erase(it);
+                continue;
+            }
+        }
+        ++it;
+    }
 }
