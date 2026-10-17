@@ -2,8 +2,10 @@
 
 #include "blocks.h"
 
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QWheelEvent>
 
 #include <cmath>
 
@@ -18,6 +20,8 @@ constexpr qreal FieldH = StageH / UnitsPerCm;
 constexpr qreal GridCm = 10;
 constexpr qreal RobotRadius = 7;     // cm : garde le robot entier sur le terrain
 constexpr qreal RobotDrawScale = 0.25;  // dessin du robot (±24) → ~12 cm de large
+constexpr qreal MaxViewZoom = 6;
+constexpr qreal ViewZoomStep = 1.25;
 constexpr qreal ClawTravelS = 1.0;  // pince : fermée → ouverte
 constexpr qreal HeadTravelS = 1.0;  // tête : basse → haute
 constexpr int FrameMs = 16;
@@ -52,6 +56,7 @@ void drawJaws(QPainter &p, qreal claw, qreal spread, qreal length, qreal width)
 
 Stage::Stage(QWidget *parent) : QWidget(parent)
 {
+    viewCenter_ = QPointF(StageW / 2, StageH / 2);
     timer_.setInterval(FrameMs);
     connect(&timer_, &QTimer::timeout, this, &Stage::tick);
     reset();
@@ -74,6 +79,82 @@ void Stage::reset()
     heading_ = 0;
     trail_ = {pos_};
     update();
+}
+
+// --- Vue zoomable ---
+
+QTransform Stage::fitTransform() const
+{
+    // Scène centrée, à l'échelle du widget
+    const qreal scale = qMin(width() / StageW, height() / StageH);
+    QTransform t;
+    t.translate((width() - StageW * scale) / 2, (height() - StageH * scale) / 2);
+    t.scale(scale, scale);
+    return t;
+}
+
+QTransform Stage::viewTransform() const
+{
+    QTransform t;
+    t.translate(StageW / 2, StageH / 2);
+    t.scale(viewZoom_, viewZoom_);
+    t.translate(-viewCenter_.x(), -viewCenter_.y());
+    return t;
+}
+
+void Stage::setView(qreal zoom, QPointF center)
+{
+    viewZoom_ = qBound(1.0, zoom, MaxViewZoom);
+    const qreal hw = StageW / (2 * viewZoom_), hh = StageH / (2 * viewZoom_);
+    viewCenter_ = QPointF(qBound(hw, center.x(), StageW - hw), qBound(hh, center.y(), StageH - hh));
+    setCursor(viewZoom_ > 1 ? Qt::OpenHandCursor : Qt::ArrowCursor);
+    update();
+}
+
+void Stage::wheelEvent(QWheelEvent *e)
+{
+    const int delta = e->angleDelta().y();
+    if (delta == 0)
+        return e->ignore();
+    // Le point du dessin sous la souris reste sous la souris
+    const QPointF p = fitTransform().inverted().map(e->position());
+    const QPointF world = viewTransform().inverted().map(p);
+    const qreal zoom = qBound(1.0, viewZoom_ * std::pow(ViewZoomStep, delta / 120.0), MaxViewZoom);
+    setView(zoom, world - (p - QPointF(StageW / 2, StageH / 2)) / zoom);
+    e->accept();
+}
+
+void Stage::mousePressEvent(QMouseEvent *e)
+{
+    if (e->button() != Qt::LeftButton || viewZoom_ <= 1)
+        return QWidget::mousePressEvent(e);
+    dragging_ = true;
+    dragLast_ = e->position();
+    setCursor(Qt::ClosedHandCursor);
+}
+
+void Stage::mouseMoveEvent(QMouseEvent *e)
+{
+    if (!dragging_)
+        return QWidget::mouseMoveEvent(e);
+    const qreal fit = fitTransform().m11();
+    const QPointF delta = (e->position() - dragLast_) / (fit * viewZoom_);
+    dragLast_ = e->position();
+    setView(viewZoom_, viewCenter_ - delta);
+}
+
+void Stage::mouseReleaseEvent(QMouseEvent *e)
+{
+    if (!dragging_)
+        return QWidget::mouseReleaseEvent(e);
+    dragging_ = false;
+    setCursor(viewZoom_ > 1 ? Qt::OpenHandCursor : Qt::ArrowCursor);
+}
+
+void Stage::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton)
+        setView(1, QPointF(StageW / 2, StageH / 2));
 }
 
 void Stage::setSpeech(const QString &text)
@@ -237,14 +318,16 @@ void Stage::paintEvent(QPaintEvent *)
     p.fillRect(rect(), QColor(0x11, 0x11, 0x11));
 
     // Scène centrée, à l'échelle
-    const qreal scale = qMin(width() / StageW, height() / StageH);
-    p.translate((width() - StageW * scale) / 2, (height() - StageH * scale) / 2);
-    p.scale(scale, scale);
+    p.setTransform(fitTransform());
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0xF4, 0xF4, 0xF4));
     p.drawRoundedRect(QRectF(0, 0, StageW, StageH), 6, 6);
-    // Terrain en cm : carreaux de 10 cm
+    // Terrain en cm : carreaux de 10 cm, avec le zoom de la vue
     p.save();
+    QPainterPath clip;
+    clip.addRoundedRect(QRectF(0, 0, StageW, StageH), 6, 6);
+    p.setClipPath(clip);
+    p.setTransform(viewTransform(), true);
     p.scale(UnitsPerCm, UnitsPerCm);
     QPen grid(QColor(0xDD, 0xDD, 0xDD), 1);
     grid.setCosmetic(true);
@@ -286,6 +369,15 @@ void Stage::paintEvent(QPaintEvent *)
     p.restore();
     p.restore();  // fin du terrain en cm
 
+    if (viewZoom_ > 1) {
+        QFont zf = font();
+        zf.setPixelSize(11);
+        p.setFont(zf);
+        p.setPen(QColor(0x88, 0x88, 0x88));
+        p.drawText(QRectF(0, StageH - 16, StageW, 14), Qt::AlignHCenter | Qt::AlignVCenter,
+                   QStringLiteral("zoom ×%1 · double-clic : 100 %").arg(QString::number(viewZoom_, 'f', 1).replace('.', ',')));
+    }
+
     // Variables, comme les moniteurs de Scratch
     QFont mf = font();
     mf.setPixelSize(12);
@@ -322,7 +414,7 @@ void Stage::paintEvent(QPaintEvent *)
         const QFontMetricsF bfm(bf);
         const QRectF text = bfm.boundingRect(QRectF(0, 0, 170, 1000), Qt::TextWordWrap, speech_);
         QRectF bubble(0, 0, text.width() + 20, text.height() + 14);
-        const QPointF robot = pos_ * UnitsPerCm;
+        const QPointF robot = viewTransform().map(pos_ * UnitsPerCm);  // bulle à taille normale, au-dessus du robot zoomé
         bubble.moveBottomLeft(robot + QPointF(16, -30));
         bubble.moveLeft(qBound(4.0, bubble.left(), StageW - bubble.width() - 4));
         bubble.moveTop(qBound(4.0, bubble.top(), StageH - bubble.height() - 4));

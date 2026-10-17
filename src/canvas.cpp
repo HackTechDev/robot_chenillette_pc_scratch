@@ -948,17 +948,20 @@ void Canvas::commitEdit()
 
 void Canvas::wheelEvent(QWheelEvent *e)
 {
+    // Molette : zoom autour de la souris ; sur un nombre, le change ; Maj+molette (ou défilement
+    // horizontal d'un pavé tactile) : la vue défile
     const int delta = e->angleDelta().y();
-    if (e->modifiers() & Qt::ControlModifier) {
-        setZoom(zoom_ * std::pow(ZoomStep, delta / qreal(WheelNotch)), e->position());
-        return e->accept();
+    if ((e->modifiers() & Qt::ShiftModifier) || delta == 0) {
+        wheelAccum_ = 0;
+        return e->ignore();
     }
     const QPointF m = toModel(e->position());
     const int i = itemAt(m);
     const int input = i >= 0 && items_[i].block->spec().param != Param::Bool ? items_[i].valueAt(m) : -1;
-    if (input < 0) {
+    if (input < 0 || (e->modifiers() & Qt::ControlModifier)) {
         wheelAccum_ = 0;
-        return e->ignore();  // la vue défile
+        setZoom(zoom_ * std::pow(ZoomStep, delta / qreal(WheelNotch)), e->position());
+        return e->accept();
     }
     e->accept();
     // Crans entiers (un pavé tactile envoie de petites valeurs)

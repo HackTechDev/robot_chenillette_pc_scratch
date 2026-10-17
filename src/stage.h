@@ -32,8 +32,17 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *e) override;
+    // Vue : molette = zoom autour de la souris, glisser = déplacer, double-clic = 100 %
+    void wheelEvent(QWheelEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
+    void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 private:
+    QTransform fitTransform() const;   // unités de dessin (480 × 360) → widget
+    QTransform viewTransform() const;  // zoom de la vue, en unités de dessin
+    void setView(qreal zoom, QPointF center);  // bornée : le terrain remplit toujours la vue
     void advance();  // applique le mouvement en cours depuis le dernier appel
     void move(qreal distance);  // cm
     void drive(qreal dt);       // ligne droite, avec rampe
@@ -53,6 +62,10 @@ private:
     QList<QPointF> trail_;
     QList<QPair<QString, double>> monitors_;
     QString speech_;
+    qreal viewZoom_ = 1;
+    QPointF viewCenter_;  // point du dessin au centre de la vue
+    QPointF dragLast_;    // glisser la vue (coordonnées du widget)
+    bool dragging_ = false;
     QTimer timer_;
     QElapsedTimer clock_;
     bool clawZoom_ = false;     // loupe affichée (pendant et juste après un mouvement de pince)

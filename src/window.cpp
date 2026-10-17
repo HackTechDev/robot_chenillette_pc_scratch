@@ -288,7 +288,7 @@ Window::Window(QWidget *parent) : QWidget(parent)
     QLabel *hint = label(QStringLiteral("Glisser les blocs dans la zone de programme · clic sur un nombre pour le "
                                         "modifier, molette pour l'ajuster · clic sur un script pour l'exécuter (double-clic si le robot est connecté) · "
                                         "clic droit : dupliquer / supprimer, commentaire, ranger · bloc ramené sur la palette = "
-                                        "supprimé · glisser le fond : déplacer la vue · Ctrl+molette : zoom · "
+                                        "supprimé · glisser le fond : déplacer la vue · molette : zoom (Maj+molette : défiler) · "
                                         "Échap = arrêt"),
                          QStringLiteral("hint"));
     hint->setWordWrap(true);
